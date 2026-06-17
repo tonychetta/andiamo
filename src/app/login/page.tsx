@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Eye, EyeSlash } from "@phosphor-icons/react";
 import { Logo } from "@/components/Logo";
 import { createClient } from "@/lib/supabase/client";
 
@@ -102,13 +103,10 @@ export default function LoginPage() {
             required
           />
 
-          <Field
-            label="Password"
+          <PasswordField
             value={password}
             onChange={setPassword}
-            type="password"
             autoComplete={isSignup ? "new-password" : "current-password"}
-            required
           />
 
           {isSignup && (
@@ -194,6 +192,41 @@ function Field({
         required={required}
         className="w-full rounded-xl border border-line bg-surface-secondary px-4 py-3 text-ink outline-none transition-colors placeholder:text-ink-soft focus:border-ink"
       />
+    </label>
+  );
+}
+
+function PasswordField({
+  value,
+  onChange,
+  autoComplete,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  autoComplete?: string;
+}) {
+  const [show, setShow] = useState(false);
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-sm text-ink">Password</span>
+      <div className="relative">
+        <input
+          type={show ? "text" : "password"}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          autoComplete={autoComplete}
+          required
+          className="w-full rounded-xl border border-line bg-surface-secondary px-4 py-3 pr-12 text-ink outline-none transition-colors placeholder:text-ink-soft focus:border-ink"
+        />
+        <button
+          type="button"
+          onClick={() => setShow((s) => !s)}
+          aria-label={show ? "Hide password" : "Show password"}
+          className="absolute inset-y-0 right-0 grid w-12 place-items-center text-ink-soft transition-colors hover:text-ink"
+        >
+          {show ? <EyeSlash size={20} /> : <Eye size={20} />}
+        </button>
+      </div>
     </label>
   );
 }
