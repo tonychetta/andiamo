@@ -45,8 +45,12 @@ export async function updateSession(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
   const isPublic = path.startsWith("/login") || path.startsWith("/auth");
+  // API routes enforce their own auth (session cookie or a shared secret, e.g.
+  // the MGMT webhook) and must return JSON — never redirect them to the HTML
+  // login page. The session is still refreshed above for browser-called APIs.
+  const isApi = path.startsWith("/api");
 
-  if (!user && !isPublic) {
+  if (!user && !isPublic && !isApi) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
