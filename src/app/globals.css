@@ -1,26 +1,121 @@
 @import "tailwindcss";
 
+/*
+  ANDIAMO DESIGN SYSTEM
+  ---------------------
+  Color + type tokens from the build document (Section 6).
+  These are the single source of truth for the brand look.
+  Change a value here and it updates everywhere in the app.
+
+  The aesthetic: premium, restrained, editorial, warm.
+  Think beautiful stationery, not a SaaS dashboard.
+*/
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Surfaces — warm cream backgrounds, deliberately low contrast */
+  --surface-primary: #f7f3ec; /* most screens — bone, not tan */
+  --surface-secondary: #efe9de; /* cards, modals, panels — pale oat */
+  --surface-accent: #e7ddcb; /* Vision page, celebration screens — richer beige */
+
+  /* Text — warm ink, never pure black */
+  --text-primary: #2c2522; /* body + headings — espresso */
+  --text-secondary: #847b70; /* captions, metadata, timestamps */
+
+  /* Accents — reserved for EARNED moments. Overuse kills their signal. */
+  --accent-cyan: #5ff5f5; /* primary CTAs, active states, completion */
+  --accent-gold: #c7a35c; /* priority task, milestone celebration, "earned" flags */
+
+  /* Hairlines + subtle dividers */
+  --line: #e2dac9;
+
+  /* Deep, warm near-black — the Vision Builder's quiet "sacred space" */
+  --surface-night: #0c0b0a;
 }
 
+/*
+  Map the brand tokens into Tailwind so we can write utility classes like
+  `bg-surface-primary`, `text-ink`, `text-accent-cyan`, `font-serif`, etc.
+*/
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-surface-primary: var(--surface-primary);
+  --color-surface-secondary: var(--surface-secondary);
+  --color-surface-accent: var(--surface-accent);
+  --color-ink: var(--text-primary);
+  --color-ink-soft: var(--text-secondary);
+  --color-accent-cyan: var(--accent-cyan);
+  --color-accent-gold: var(--accent-gold);
+  --color-line: var(--line);
+  --color-surface-night: var(--surface-night);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* Fonts — wired to next/font variables set in layout.tsx */
+  --font-serif: var(--font-fraunces); /* editorial display — placeholder for Kepler Std */
+  --font-sans: var(--font-inter); /* warm humanist body */
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--surface-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/*
+  Priority Task bullet — the app's most important visual signature after the logo.
+  A gold bullet with a soft halo glow. Used on the WTF and any Priority Task row.
+  (Section 6.5)
+*/
+.priority-bullet {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 9999px;
+  background: var(--accent-gold);
+  box-shadow:
+    0 0 3px 1px color-mix(in srgb, var(--accent-gold) 70%, transparent),
+    0 0 6px 2px color-mix(in srgb, var(--accent-gold) 35%, transparent);
+}
+
+/* Gentle entrance — used so the Vision Builder feels like stepping into a space */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.fade-in-up {
+  animation: fadeInUp 0.7s ease-out both;
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.fade-in {
+  animation: fadeIn 0.45s ease-out both;
+}
+.fade-in-slow {
+  animation: fadeInUp 1.3s ease-out both;
+}
+
+/* Twinkling AI stars — shown while the model is generating */
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.85) rotate(-6deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.12) rotate(6deg);
+  }
+}
+.animate-twinkle {
+  animation: twinkle 1s ease-in-out infinite;
 }

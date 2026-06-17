@@ -1,0 +1,17 @@
+{
+  "name": "Andiamo",
+  "short_name": "Andiamo",
+  "description": "The bridge between potential and momentum for independent musicians.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f3ec",
+  "theme_color": "#0c0b0a",
+  "icons": [
+    {
+      "src": "/logo-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
