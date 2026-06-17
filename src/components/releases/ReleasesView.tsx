@@ -843,6 +843,7 @@ function AddReleaseModal({
   const [date, setDate] = useState("");
   const [type, setType] = useState<ReleaseType>("single");
   const [notes, setNotes] = useState("");
+  const [mgmtCode, setMgmtCode] = useState("");
 
   const canSubmit = title.trim() && date;
 
@@ -854,6 +855,8 @@ function AddReleaseModal({
         releaseDate: date,
         releaseType: type,
         notes: notes.trim() || undefined,
+        // Only singles track production; don't attach a code to a project.
+        mgmtLink: type === "single" ? mgmtCode.trim() || undefined : undefined,
       });
       router.refresh();
       onClose();
@@ -932,6 +935,24 @@ function AddReleaseModal({
                 : "Generates a 20-week project (EP/album) schedule."}
             </p>
           </div>
+
+          {type === "single" && (
+            <div>
+              <label className="text-xs uppercase tracking-wide text-ink-soft">
+                MGMT song code (optional)
+              </label>
+              <input
+                value={mgmtCode}
+                onChange={(e) => setMgmtCode(e.target.value)}
+                placeholder="e.g. K7M2QX — or paste the song link"
+                className="mt-1.5 w-full rounded-xl border border-line bg-surface-secondary px-3 py-2.5 text-sm text-ink outline-none focus:border-ink"
+              />
+              <p className="mt-1.5 text-xs text-ink-soft">
+                Links this single to its MGMT song for the production bubbles. You
+                can add it later too.
+              </p>
+            </div>
+          )}
 
           <div>
             <label className="text-xs uppercase tracking-wide text-ink-soft">

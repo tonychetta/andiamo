@@ -31,6 +31,7 @@ export async function addRelease(input: {
   releaseDate: string; // YYYY-MM-DD
   releaseType: "single" | "project";
   notes?: string;
+  mgmtLink?: string; // MGMT song code or link (optional)
 }) {
   const title = input.title.trim();
   if (!title || !input.releaseDate) return;
@@ -45,6 +46,7 @@ export async function addRelease(input: {
       release_type: input.releaseType,
       release_date: input.releaseDate,
       notes: input.notes?.trim() || null,
+      mgmt_link: input.mgmtLink?.trim() || null,
     })
     .select("id")
     .single();
