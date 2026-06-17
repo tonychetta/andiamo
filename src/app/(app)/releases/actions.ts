@@ -2,7 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { templateFor } from "@/lib/releases/templates";
+import {
+  defaultEditableTemplate,
+  type EditablePhase,
+} from "@/lib/releases/templates";
 
 // RLS guarantees every mutation here only touches the signed-in artist's rows.
 
@@ -47,9 +50,20 @@ export async function addRelease(input: {
     .single();
   if (error) throw new Error(error.message);
 
-  // Tasks are created UNASSIGNED. Assigning to artist vs producer is a manual
-  // step taken during a meeting (DWY only) — never auto-applied here.
-  const phases = templateFor(input.releaseType);
+  // Expand the artist's template (their customized one if any, else the default)
+  // into dated tasks. Tasks are created UNASSIGNED — assigning artist vs producer
+  // is a manual, DWY-only step, never auto-applied here.
+  const { data: custom } = await supabase
+    .from("release_templates")
+    .select("phases")
+    .eq("artist_id", aid)
+    .eq("template_type", input.releaseType)
+    .maybeSingle();
+  const phases =
+    custom?.phases && Array.isArray(custom.phases) && custom.phases.length
+      ? (custom.phases as unknown as EditablePhase[])
+      : defaultEditableTemplate(input.releaseType);
+
   const rows: {
     artist_id: string;
     release_id: string;
@@ -61,11 +75,12 @@ export async function addRelease(input: {
   }[] = [];
   let order = 0;
   for (const phase of phases) {
-    for (const task of phase.tasks) {
+    for (const description of phase.tasks) {
+      if (!description?.trim()) continue;
       rows.push({
         artist_id: aid,
         release_id: release.id,
-        description: task.description,
+        description: description.trim(),
         phase_label: phase.label,
         offset_days: phase.offsetDays,
         due_date: addDays(input.releaseDate, phase.offsetDays),
@@ -257,6 +272,46 @@ export async function deleteReleaseTask(taskId: string) {
     .from("release_tasks")
     .delete()
     .eq("id", taskId);
+  if (error) throw new Error(error.message);
+  revalidatePath("/releases");
+}
+
+// ---------- Master templates (Section 11.7) ----------
+
+// Save the artist's customized template for a type. Only affects FUTURE releases
+// — releases already created keep their materialized tasks.
+export async function saveTemplate(
+  templateType: "single" | "project",
+  phases: EditablePhase[],
+) {
+  const { supabase, artistId: aid } = await artistId();
+  if (!aid) return;
+  const clean: EditablePhase[] = phases.map((p) => ({
+    label: p.label,
+    offsetDays: p.offsetDays,
+    tasks: p.tasks.map((t) => t.trim()).filter(Boolean),
+  }));
+  const { error } = await supabase.from("release_templates").upsert(
+    {
+      artist_id: aid,
+      template_type: templateType,
+      phases: clean as unknown as never,
+    },
+    { onConflict: "artist_id,template_type" },
+  );
+  if (error) throw new Error(error.message);
+  revalidatePath("/releases");
+}
+
+// Revert to the canonical default by removing the artist's customization.
+export async function resetTemplate(templateType: "single" | "project") {
+  const { supabase, artistId: aid } = await artistId();
+  if (!aid) return;
+  const { error } = await supabase
+    .from("release_templates")
+    .delete()
+    .eq("artist_id", aid)
+    .eq("template_type", templateType);
   if (error) throw new Error(error.message);
   revalidatePath("/releases");
 }

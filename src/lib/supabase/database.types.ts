@@ -303,6 +303,41 @@ export type Database = {
           },
         ]
       }
+      release_templates: {
+        Row: {
+          artist_id: string
+          created_at: string
+          id: string
+          phases: Json
+          template_type: string
+          updated_at: string
+        }
+        Insert: {
+          artist_id: string
+          created_at?: string
+          id?: string
+          phases?: Json
+          template_type: string
+          updated_at?: string
+        }
+        Update: {
+          artist_id?: string
+          created_at?: string
+          id?: string
+          phases?: Json
+          template_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "release_templates_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "artists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       release_tasks: {
         Row: {
           artist_id: string

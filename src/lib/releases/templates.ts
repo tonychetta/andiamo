@@ -443,3 +443,24 @@ export const PROJECT_TEMPLATE: TemplatePhase[] = [
 export function templateFor(type: "single" | "project"): TemplatePhase[] {
   return type === "project" ? PROJECT_TEMPLATE : SINGLE_TEMPLATE;
 }
+
+// ---------- Editable templates (Section 11.7) ----------
+// The shape we edit + persist per artist. Tasks are plain strings (assignment is
+// a separate manual/DWY step, not part of the template).
+export type EditablePhase = {
+  label: string;
+  offsetDays: number;
+  tasks: string[];
+};
+
+// The canonical default for a type, in editable form (drops assignee).
+export function defaultEditableTemplate(
+  type: "single" | "project",
+): EditablePhase[] {
+  return templateFor(type).map((phase) => ({
+    label: phase.label,
+    offsetDays: phase.offsetDays,
+    tasks: phase.tasks.map((t) => t.description),
+  }));
+}
+

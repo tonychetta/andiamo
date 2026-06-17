@@ -5,6 +5,10 @@ import {
   songIdFromLink,
   type ProductionState,
 } from "@/lib/releases/mgmt";
+import {
+  defaultEditableTemplate,
+  type EditablePhase,
+} from "@/lib/releases/templates";
 
 export default async function ReleasesPage() {
   const supabase = await createClient();
@@ -49,10 +53,37 @@ export default async function ReleasesPage() {
   );
   for (const [id, state] of statuses) if (state) production[id] = state;
 
+  // Editable templates: the artist's customized version if any, else the default.
+  const { data: customTemplates } = await supabase
+    .from("release_templates")
+    .select("template_type, phases");
+  const customByType = new Map(
+    (customTemplates ?? []).map((t) => [t.template_type, t.phases]),
+  );
+  const asPhases = (
+    type: "single" | "project",
+  ): EditablePhase[] => {
+    const c = customByType.get(type);
+    return c && Array.isArray(c) && c.length
+      ? (c as unknown as EditablePhase[])
+      : defaultEditableTemplate(type);
+  };
+  const templates = {
+    single: asPhases("single"),
+    project: asPhases("project"),
+    singleCustom: customByType.has("single"),
+    projectCustom: customByType.has("project"),
+  };
+
   // Pass the server's "today" so the countdown is deterministic (no hydration drift).
   const today = new Date().toISOString().slice(0, 10);
 
   return (
-    <ReleasesView releases={releasesData} today={today} production={production} />
+    <ReleasesView
+      releases={releasesData}
+      today={today}
+      production={production}
+      templates={templates}
+    />
   );
 }

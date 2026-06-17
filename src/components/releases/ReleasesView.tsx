@@ -22,6 +22,7 @@ import {
   addLaunchTasks,
   deleteReleaseTask,
 } from "@/app/(app)/releases/actions";
+import { TemplateEditor, type TemplatesProp } from "./TemplateEditor";
 
 type ReleaseType = "single" | "project";
 type Assignee = "artist" | "producer" | "both" | "unassigned";
@@ -89,13 +90,16 @@ export function ReleasesView({
   releases,
   today,
   production,
+  templates,
 }: {
   releases: Release[];
   today: string;
   production: Record<string, ProductionState>;
+  templates: TemplatesProp;
 }) {
   const [adding, setAdding] = useState(false);
   const [showPast, setShowPast] = useState(false);
+  const [editingTemplates, setEditingTemplates] = useState(false);
 
   const upcoming = releases.filter((r) => dayDiff(today, r.release_date) >= 0);
   const past = releases
@@ -104,9 +108,15 @@ export function ReleasesView({
 
   return (
     <section>
-      <h1 className="mb-6 font-serif text-4xl leading-tight text-ink">
-        Releases
-      </h1>
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <h1 className="font-serif text-4xl leading-tight text-ink">Releases</h1>
+        <button
+          onClick={() => setEditingTemplates(true)}
+          className="shrink-0 text-sm text-ink-soft transition-colors hover:text-ink"
+        >
+          Templates
+        </button>
+      </div>
 
       {releases.length === 0 ? (
         <div className="mt-2 rounded-2xl border border-dashed border-line p-10 text-center">
@@ -173,6 +183,12 @@ export function ReleasesView({
       </button>
 
       {adding && <AddReleaseModal today={today} onClose={() => setAdding(false)} />}
+      {editingTemplates && (
+        <TemplateEditor
+          templates={templates}
+          onClose={() => setEditingTemplates(false)}
+        />
+      )}
     </section>
   );
 }
