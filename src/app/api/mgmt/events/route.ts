@@ -9,7 +9,8 @@ export const runtime = "nodejs";
 
 type MgmtEvent = {
   event?: string;
-  songId?: string;
+  code?: string; // the short Andiamo pairing code (preferred identifier)
+  songId?: string; // raw MGMT song id (still accepted, e.g. from a pasted URL)
   songTitle?: string;
   process?: string;
   taskName?: string;
@@ -24,19 +25,28 @@ export async function POST(req: Request) {
   }
 
   const body = (await req.json().catch(() => null)) as MgmtEvent | null;
-  if (!body?.event || !body.songId) {
+  if (!body?.event || (!body.code && !body.songId)) {
     return Response.json({ error: "Bad request" }, { status: 400 });
   }
 
   if (body.event === "timer_started") {
     const admin = createAdminClient();
-    // The release that links this MGMT song id tells us which artist to notify.
-    const { data: release } = await admin
-      .from("releases")
-      .select("artist_id, title")
-      .ilike("mgmt_link", `%${body.songId}%`)
-      .limit(1)
-      .maybeSingle();
+    // Find the release whose stored code/link matches. The artist may have
+    // pasted a short code (mobile) or a full song URL (desktop), so match on
+    // either identifier MGMT sends. Sanitize to keep the .or() filter safe.
+    const ids = [body.code, body.songId]
+      .filter((v): v is string => !!v)
+      .map((v) => v.replace(/[^a-zA-Z0-9_-]/g, ""))
+      .filter(Boolean);
+    const orExpr = ids.map((v) => `mgmt_link.ilike.%${v}%`).join(",");
+    const { data: release } = orExpr
+      ? await admin
+          .from("releases")
+          .select("artist_id, title")
+          .or(orExpr)
+          .limit(1)
+          .maybeSingle()
+      : { data: null };
 
     if (release?.artist_id) {
       const who = body.producerName?.trim() || "Your producer";

@@ -452,12 +452,12 @@ function ReleaseDetail({ release }: { release: Release }) {
               <input
                 value={mgmtDraft}
                 onChange={(e) => setMgmtDraft(e.target.value)}
-                placeholder="MGMT song link (for production status)"
+                placeholder="MGMT song code or link"
                 className="mt-2 w-full rounded-lg border border-line bg-surface-secondary px-3 py-2 text-sm text-ink outline-none focus:border-ink"
               />
               <p className="mt-1 text-xs text-ink-soft">
-                Paste the song-card link from your MGMT app to light up the
-                PROD/EDT/MIX/MST bubbles.
+                Paste the song&apos;s code (tap Copy on its MGMT song card) — or
+                its link — to light up the PROD/EDT/MIX/MST bubbles.
               </p>
             </>
           )}
