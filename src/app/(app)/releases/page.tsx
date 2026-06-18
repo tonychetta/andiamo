@@ -16,7 +16,9 @@ export default async function ReleasesPage() {
   const [{ data: releases }, { data: tasks }] = await Promise.all([
     supabase
       .from("releases")
-      .select("id, title, release_type, release_date, notes, mgmt_link")
+      .select(
+        "id, title, release_type, release_date, notes, mgmt_link, parent_release_id",
+      )
       .order("release_date", { ascending: true }),
     supabase
       .from("release_tasks")

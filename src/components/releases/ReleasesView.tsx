@@ -47,7 +47,17 @@ type Release = {
   release_date: string;
   notes: string | null;
   mgmt_link: string | null;
+  parent_release_id: string | null;
   tasks: Task[];
+};
+
+// Lightweight view of every release, for resolving project<->single links.
+type ReleaseLite = {
+  id: string;
+  title: string;
+  release_type: ReleaseType;
+  release_date: string;
+  parent_release_id: string | null;
 };
 
 // ---------- date helpers (UTC-anchored, date-only) ----------
@@ -57,6 +67,13 @@ function dayDiff(today: string, date: string): number {
   return Math.round(
     (Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86_400_000,
   );
+}
+
+function shiftDate(date: string, days: number): string {
+  const [y, m, d] = date.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d) + days * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
 }
 
 function fmtDate(date: string | null): string {
@@ -106,6 +123,15 @@ export function ReleasesView({
     .filter((r) => dayDiff(today, r.release_date) < 0)
     .reverse(); // most-recently-released first
 
+  // Every release in lite form, so a card can resolve its project/single links.
+  const siblings: ReleaseLite[] = releases.map((r) => ({
+    id: r.id,
+    title: r.title,
+    release_type: r.release_type,
+    release_date: r.release_date,
+    parent_release_id: r.parent_release_id,
+  }));
+
   return (
     <section>
       <div className="mb-6 flex items-center justify-between gap-3">
@@ -138,6 +164,7 @@ export function ReleasesView({
                 release={r}
                 today={today}
                 production={production[r.id]}
+                siblings={siblings}
               />
             ))}
             {upcoming.length === 0 && (
@@ -164,6 +191,7 @@ export function ReleasesView({
                       release={r}
                       today={today}
                       production={production[r.id]}
+                      siblings={siblings}
                     />
                   ))}
                 </div>
@@ -253,10 +281,12 @@ function ReleaseCard({
   release,
   today,
   production,
+  siblings,
 }: {
   release: Release;
   today: string;
   production?: ProductionState;
+  siblings: ReleaseLite[];
 }) {
   const [open, setOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -264,6 +294,10 @@ function ReleaseCard({
 
   const pre = release.tasks.filter((t) => t.offset_days < 0);
   const preDone = pre.filter((t) => t.is_completed).length;
+
+  const parent = release.parent_release_id
+    ? siblings.find((s) => s.id === release.parent_release_id)
+    : undefined;
 
   return (
     <div className="relative overflow-hidden rounded-2xl bg-surface-secondary shadow-sm ring-1 ring-ink/5">
@@ -282,6 +316,12 @@ function ReleaseCard({
         <p className="mt-2 font-serif text-2xl leading-snug text-ink">
           {release.title}
         </p>
+        {parent && (
+          <p className="mt-1 text-xs text-ink-soft">
+            Linked single of{" "}
+            <span className="text-ink">{parent.title}</span>
+          </p>
+        )}
         {/* Only singles track the 4 production processes; projects don't. */}
         {release.release_type === "single" && (
           <ProductionBar state={production ?? EMPTY_PRODUCTION} />
@@ -304,7 +344,7 @@ function ReleaseCard({
         <Trash size={16} />
       </button>
 
-      {open && <ReleaseDetail release={release} />}
+      {open && <ReleaseDetail release={release} siblings={siblings} />}
       {confirmDelete && (
         <DeleteReleaseModal
           release={release}
@@ -383,7 +423,13 @@ function DeleteReleaseModal({
   );
 }
 
-function ReleaseDetail({ release }: { release: Release }) {
+function ReleaseDetail({
+  release,
+  siblings,
+}: {
+  release: Release;
+  siblings: ReleaseLite[];
+}) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [addingPhase, setAddingPhase] = useState<number | null>(null);
@@ -394,6 +440,31 @@ function ReleaseDetail({ release }: { release: Release }) {
   const [titleDraft, setTitleDraft] = useState(release.title);
   const [notesDraft, setNotesDraft] = useState(release.notes ?? "");
   const [mgmtDraft, setMgmtDraft] = useState(release.mgmt_link ?? "");
+  const [addingSingle, setAddingSingle] = useState(false);
+  const [singleTitle, setSingleTitle] = useState("");
+  // Default a linked single to ~6 weeks before the project (lead-single timing).
+  const [singleDate, setSingleDate] = useState(
+    shiftDate(release.release_date, -42),
+  );
+
+  const linkedSingles = siblings
+    .filter((s) => s.parent_release_id === release.id)
+    .sort((a, b) => a.release_date.localeCompare(b.release_date));
+
+  function addSingle() {
+    const title = singleTitle.trim();
+    if (!title || !singleDate) return;
+    setSingleTitle("");
+    setAddingSingle(false);
+    run(async () => {
+      await addRelease({
+        title,
+        releaseDate: singleDate,
+        releaseType: "single",
+        parentReleaseId: release.id,
+      });
+    });
+  }
 
   function run(fn: () => Promise<void>) {
     startTransition(async () => {
@@ -553,6 +624,78 @@ function ReleaseDetail({ release }: { release: Release }) {
       </div>
 
       <LaunchPlanner releaseId={release.id} onRun={run} />
+
+      {/* Linked singles — only on projects (Section 11.4, Option C) */}
+      {release.release_type === "project" && (
+        <div className="mt-6 border-t border-line pt-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink">
+            Linked singles
+          </p>
+          <p className="mt-1 text-xs text-ink-soft">
+            Lead/second singles run their own 12-week schedule in parallel.
+          </p>
+          {linkedSingles.length > 0 && (
+            <ul className="mt-3 space-y-1.5">
+              {linkedSingles.map((s) => (
+                <li
+                  key={s.id}
+                  className="flex items-center justify-between gap-3 rounded-lg bg-surface-primary px-3 py-2"
+                >
+                  <span className="text-sm text-ink">{s.title}</span>
+                  <span className="text-xs text-ink-soft">
+                    {fmtDate(s.release_date)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {addingSingle ? (
+            <div className="mt-3 space-y-2 rounded-xl border border-line bg-surface-primary p-3">
+              <input
+                autoFocus
+                value={singleTitle}
+                onChange={(e) => setSingleTitle(e.target.value)}
+                placeholder="Single title"
+                className="w-full rounded-lg border border-line bg-surface-secondary px-3 py-2 text-sm text-ink outline-none focus:border-ink"
+              />
+              <input
+                type="date"
+                value={singleDate}
+                onChange={(e) => setSingleDate(e.target.value)}
+                className="w-full rounded-lg border border-line bg-surface-secondary px-3 py-2 text-sm text-ink outline-none focus:border-ink"
+              />
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => {
+                    setSingleTitle("");
+                    setAddingSingle(false);
+                  }}
+                  className="rounded-lg px-3 py-1.5 text-sm text-ink-soft"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={addSingle}
+                  className="rounded-lg bg-ink px-3 py-1.5 text-sm text-surface-primary"
+                >
+                  Add single
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                setSingleDate(shiftDate(release.release_date, -42));
+                setAddingSingle(true);
+              }}
+              className="mt-3 inline-flex items-center gap-1.5 text-sm text-ink-soft transition-colors hover:text-ink"
+            >
+              <Plus size={15} /> Add linked single
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Footer actions */}
       <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-line pt-4">

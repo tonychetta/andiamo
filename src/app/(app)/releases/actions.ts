@@ -32,7 +32,8 @@ export async function addRelease(input: {
   releaseType: "single" | "project";
   notes?: string;
   mgmtLink?: string; // MGMT song code or link (optional)
-}) {
+  parentReleaseId?: string; // set when this single is linked to a project
+}): Promise<string | undefined> {
   const title = input.title.trim();
   if (!title || !input.releaseDate) return;
   const { supabase, artistId: aid } = await artistId();
@@ -47,6 +48,7 @@ export async function addRelease(input: {
       release_date: input.releaseDate,
       notes: input.notes?.trim() || null,
       mgmt_link: input.mgmtLink?.trim() || null,
+      parent_release_id: input.parentReleaseId ?? null,
     })
     .select("id")
     .single();
@@ -95,6 +97,7 @@ export async function addRelease(input: {
     if (taskErr) throw new Error(taskErr.message);
   }
   revalidatePath("/releases");
+  return release.id;
 }
 
 export async function updateReleaseDetails(
