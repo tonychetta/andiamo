@@ -124,6 +124,157 @@ export type Database = {
           },
         ]
       }
+      content_links: {
+        Row: {
+          artist_id: string
+          comments: number | null
+          content_piece_id: string
+          created_at: string
+          id: string
+          likes: number | null
+          platform: string
+          saves: number | null
+          shares: number | null
+          updated_at: string
+          url: string
+          views: number | null
+        }
+        Insert: {
+          artist_id: string
+          comments?: number | null
+          content_piece_id: string
+          created_at?: string
+          id?: string
+          likes?: number | null
+          platform?: string
+          saves?: number | null
+          shares?: number | null
+          updated_at?: string
+          url?: string
+          views?: number | null
+        }
+        Update: {
+          artist_id?: string
+          comments?: number | null
+          content_piece_id?: string
+          created_at?: string
+          id?: string
+          likes?: number | null
+          platform?: string
+          saves?: number | null
+          shares?: number | null
+          updated_at?: string
+          url?: string
+          views?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_links_content_piece_id_fkey"
+            columns: ["content_piece_id"]
+            isOneToOne: false
+            referencedRelation: "content_pieces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_piece_types: {
+        Row: {
+          artist_id: string
+          content_piece_id: string
+          tag_id: string
+        }
+        Insert: {
+          artist_id: string
+          content_piece_id: string
+          tag_id: string
+        }
+        Update: {
+          artist_id?: string
+          content_piece_id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_piece_types_content_piece_id_fkey"
+            columns: ["content_piece_id"]
+            isOneToOne: false
+            referencedRelation: "content_pieces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_piece_types_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "content_type_tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_pieces: {
+        Row: {
+          artist_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          scheduled_date: string
+          song_id: string | null
+          song_sections: string[]
+          updated_at: string
+        }
+        Insert: {
+          artist_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          scheduled_date: string
+          song_id?: string | null
+          song_sections?: string[]
+          updated_at?: string
+        }
+        Update: {
+          artist_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          scheduled_date?: string
+          song_id?: string | null
+          song_sections?: string[]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_pieces_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "songs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_type_tags: {
+        Row: {
+          artist_id: string
+          color: string
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          artist_id: string
+          color?: string
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          artist_id?: string
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       goals: {
         Row: {
           artist_id: string
@@ -452,6 +603,44 @@ export type Database = {
           {
             foreignKeyName: "releases_parent_release_id_fkey"
             columns: ["parent_release_id"]
+            isOneToOne: false
+            referencedRelation: "releases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      songs: {
+        Row: {
+          artist_id: string
+          created_at: string
+          id: string
+          original_release_date: string | null
+          release_id: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          artist_id: string
+          created_at?: string
+          id?: string
+          original_release_date?: string | null
+          release_id?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          artist_id?: string
+          created_at?: string
+          id?: string
+          original_release_date?: string | null
+          release_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "songs_release_id_fkey"
+            columns: ["release_id"]
             isOneToOne: false
             referencedRelation: "releases"
             referencedColumns: ["id"]

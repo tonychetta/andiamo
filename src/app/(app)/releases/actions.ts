@@ -54,6 +54,17 @@ export async function addRelease(input: {
     .single();
   if (error) throw new Error(error.message);
 
+  // Mirror singles into the songs registry so they're taggable in Content and
+  // trackable in Results. Non-blocking — a failure here doesn't fail the release.
+  if (input.releaseType === "single") {
+    await supabase.from("songs").insert({
+      artist_id: aid,
+      title,
+      release_id: release.id,
+      original_release_date: input.releaseDate,
+    });
+  }
+
   // Expand the artist's template (their customized one if any, else the default)
   // into dated tasks. Tasks are created UNASSIGNED — assigning artist vs producer
   // is a manual, DWY-only step, never auto-applied here.
@@ -119,6 +130,13 @@ export async function updateReleaseDetails(
     .update(patch)
     .eq("id", releaseId);
   if (error) throw new Error(error.message);
+  // Keep the mirrored song's title in sync with the release.
+  if (input.title !== undefined) {
+    await supabase
+      .from("songs")
+      .update({ title: input.title.trim() })
+      .eq("release_id", releaseId);
+  }
   revalidatePath("/releases");
 }
 

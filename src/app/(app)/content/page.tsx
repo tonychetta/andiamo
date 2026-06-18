@@ -1,11 +1,84 @@
-import { PageStub } from "@/components/PageStub";
+import { createClient } from "@/lib/supabase/server";
+import { ContentView } from "@/components/content/ContentView";
 
-export default function ContentPage() {
+export default async function ContentPage() {
+  const supabase = await createClient();
+
+  const [
+    { data: releases },
+    { data: songs },
+    { data: contentTypes },
+    { data: pieces },
+  ] = await Promise.all([
+    supabase
+      .from("releases")
+      .select("id, title, release_date")
+      .order("release_date", { ascending: true }),
+    supabase
+      .from("songs")
+      .select("id, title, original_release_date")
+      .order("title", { ascending: true }),
+    supabase
+      .from("content_type_tags")
+      .select("id, name, color")
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("content_pieces")
+      .select(
+        "id, scheduled_date, song_id, notes, song_sections, songs(title), content_piece_types(tag_id), content_links(id, platform, url, views, likes, comments, shares, saves)",
+      )
+      .order("scheduled_date", { ascending: true }),
+  ]);
+
+  type PieceRow = NonNullable<typeof pieces>[number];
+  const piecesData = (pieces ?? []).map((p: PieceRow) => ({
+    id: p.id,
+    scheduled_date: p.scheduled_date,
+    song_id: p.song_id,
+    song_title: (p.songs as { title: string } | null)?.title ?? null,
+    notes: p.notes,
+    sections: p.song_sections ?? [],
+    typeIds: (p.content_piece_types ?? []).map((t) => t.tag_id),
+    links: (p.content_links ?? []).map((l) => ({
+      id: l.id,
+      platform: l.platform,
+      url: l.url,
+      views: l.views,
+      likes: l.likes,
+      comments: l.comments,
+      shares: l.shares,
+      saves: l.saves,
+    })),
+  }));
+
+  // Platform suggestions: the common defaults plus any the artist has used.
+  const used = new Set<string>();
+  for (const p of piecesData)
+    for (const l of p.links) if (l.platform) used.add(l.platform);
+  const platforms = Array.from(
+    new Set([
+      "Instagram",
+      "TikTok",
+      "YouTube Shorts",
+      "Facebook",
+      ...Array.from(used),
+    ]),
+  );
+
+  const today = new Date().toISOString().slice(0, 10);
+
   return (
-    <PageStub
-      eyebrow="How the work gets seen"
-      title="Content"
-      blurb="Plan content on a calendar, track how each piece performs, and learn which content patterns actually work for you."
+    <ContentView
+      today={today}
+      releaseDates={(releases ?? []).map((r) => ({
+        id: r.id,
+        title: r.title,
+        date: r.release_date,
+      }))}
+      songs={songs ?? []}
+      contentTypes={contentTypes ?? []}
+      pieces={piecesData}
+      platforms={platforms}
     />
   );
 }
