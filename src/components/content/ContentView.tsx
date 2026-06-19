@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CaretLeft, CaretRight, X, Plus, Trash } from "@phosphor-icons/react";
 import {
@@ -36,34 +36,46 @@ type Piece = {
 type ReleaseDate = { id: string; title: string; date: string };
 
 const SECTIONS = [
-  "Intro",
-  "Verse 1",
-  "Pre 1",
-  "Chorus 1",
-  "Verse 2",
-  "Pre 2",
-  "Chorus 2",
-  "Bridge",
-  "Chorus 3",
-  "Outro",
+  "Intro", "Verse 1", "Pre 1", "Chorus 1", "Verse 2",
+  "Pre 2", "Chorus 2", "Bridge", "Chorus 3", "Outro",
 ];
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
-
+const DAY = 86_400_000;
 const pad = (n: number) => String(n).padStart(2, "0");
 const ymd = (y: number, m: number, d: number) => `${y}-${pad(m + 1)}-${pad(d)}`;
 
-function monthMatrix(y: number, m: number): (number | null)[][] {
-  const firstDay = new Date(Date.UTC(y, m, 1)).getUTCDay();
-  const days = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
-  const cells: (number | null)[] = Array(firstDay).fill(null);
-  for (let d = 1; d <= days; d++) cells.push(d);
-  while (cells.length % 7 !== 0) cells.push(null);
-  const weeks: (number | null)[][] = [];
-  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+type Day = { date: string; day: number; month: number; year: number };
+
+// Continuous Sun→Sat weeks across the whole range — no per-month grids.
+function buildWeeks(
+  startY: number,
+  startM: number,
+  endY: number,
+  endM: number,
+): Day[][] {
+  const firstOfStart = Date.UTC(startY, startM, 1);
+  let cur = firstOfStart - new Date(firstOfStart).getUTCDay() * DAY;
+  const lastOfEnd = Date.UTC(endY, endM + 1, 0);
+  const end = lastOfEnd + (6 - new Date(lastOfEnd).getUTCDay()) * DAY;
+  const weeks: Day[][] = [];
+  while (cur <= end) {
+    const days: Day[] = [];
+    for (let i = 0; i < 7; i++) {
+      const dt = new Date(cur + i * DAY);
+      days.push({
+        date: ymd(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate()),
+        day: dt.getUTCDate(),
+        month: dt.getUTCMonth(),
+        year: dt.getUTCFullYear(),
+      });
+    }
+    weeks.push(days);
+    cur += 7 * DAY;
+  }
   return weeks;
 }
 
@@ -96,6 +108,7 @@ export function ContentView({
   const [editing, setEditing] = useState<{ piece?: Piece; date: string } | null>(
     null,
   );
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const typeById = useMemo(
     () => new Map(typesProp.map((t) => [t.id, t])),
@@ -116,8 +129,7 @@ export function ContentView({
     return m;
   }, [releaseDates]);
 
-  // Month range: cover today, all releases, and all pieces — plus a 2-month lead.
-  const months = useMemo(() => {
+  const weeks = useMemo(() => {
     const all = [
       today,
       ...releaseDates.map((r) => r.date),
@@ -130,10 +142,12 @@ export function ContentView({
     const [ty, tm] = today.split("-").map(Number);
     const startIdx = minY * 12 + (minM - 1);
     const endIdx = Math.max(maxY * 12 + (maxM - 1), ty * 12 + (tm - 1) + 2);
-    const out: { y: number; m: number }[] = [];
-    for (let i = startIdx; i <= endIdx; i++)
-      out.push({ y: Math.floor(i / 12), m: i % 12 });
-    return out;
+    return buildWeeks(
+      Math.floor(startIdx / 12),
+      startIdx % 12,
+      Math.floor(endIdx / 12),
+      endIdx % 12,
+    );
   }, [today, releaseDates, pieces]);
 
   const nextRelease = releaseDates
@@ -143,20 +157,26 @@ export function ContentView({
     .filter((r) => r.date < today)
     .sort((a, b) => b.date.localeCompare(a.date))[0];
 
-  function scrollToDate(date: string) {
-    document
-      .getElementById(`day-${date}`)
-      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+  function scrollToDate(date: string, smooth = true) {
+    const el = document.getElementById(`day-${date}`);
+    el?.scrollIntoView({
+      behavior: smooth ? "smooth" : "auto",
+      block: "center",
+    });
   }
 
-  return (
-    <section className="pb-4">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h1 className="font-serif text-4xl leading-tight text-ink">Content</h1>
-      </div>
+  // Land on the current week when the page opens.
+  useEffect(() => {
+    scrollToDate(today, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-      {/* Jump-to-release controls */}
-      <div className="mb-4 flex gap-2">
+  return (
+    <section className="flex h-[calc(100dvh-11rem)] flex-col">
+      <h1 className="font-serif text-3xl leading-tight text-ink">Content</h1>
+
+      {/* Jump bar — stays put above the scrolling calendar */}
+      <div className="mt-3 flex gap-2">
         <button
           onClick={() => prevRelease && scrollToDate(prevRelease.date)}
           disabled={!prevRelease}
@@ -173,94 +193,99 @@ export function ContentView({
         </button>
       </div>
 
-      {/* Weekday header */}
-      <div className="mb-1 grid grid-cols-7 text-center text-[11px] font-medium uppercase tracking-wide text-ink-soft">
+      <div className="mt-2 grid grid-cols-7 text-center text-[11px] font-medium uppercase tracking-wide text-ink-soft">
         {WEEKDAYS.map((d, i) => (
           <div key={i}>{d}</div>
         ))}
       </div>
 
-      {/* Months */}
-      <div className="space-y-6">
-        {months.map(({ y, m }) => (
-          <div key={`${y}-${m}`}>
-            <h2 className="mb-2 font-serif text-lg text-ink">
-              {MONTHS[m]} {y}
-            </h2>
-            <div className="space-y-1">
-              {monthMatrix(y, m).map((week, wi) => (
-                <div key={wi} className="grid grid-cols-7 gap-1">
-                  {week.map((day, di) => {
-                    if (day === null)
-                      return <div key={di} className="min-h-[58px]" />;
-                    const date = ymd(y, m, day);
-                    const isToday = date === today;
-                    const isRelease = releaseByDate.has(date);
-                    const dayPieces = piecesByDate.get(date) ?? [];
-                    return (
-                      <button
-                        key={di}
-                        id={`day-${date}`}
-                        onClick={() => setEditing({ date })}
-                        className={`flex min-h-[58px] flex-col rounded-lg border p-1 text-left transition-colors ${
-                          isRelease
-                            ? "border-accent-gold/60 bg-accent-gold/15"
-                            : "border-line bg-surface-secondary hover:bg-surface-accent"
+      {/* Scrolling calendar (continuous weeks). overscroll-contain stops the
+          scroll from leaking into the page / a lightbox behind it. */}
+      <div
+        ref={scrollRef}
+        className="mt-1 flex-1 space-y-1 overflow-y-auto overscroll-contain pb-6"
+      >
+        {weeks.map((week, wi) => {
+          const firstOfMonth = week.find((d) => d.day === 1);
+          return (
+            <div key={wi}>
+              {firstOfMonth && (
+                <div className="px-1 pb-1 pt-2 font-serif text-base text-ink">
+                  {MONTHS[firstOfMonth.month]} {firstOfMonth.year}
+                </div>
+              )}
+              <div className="grid grid-cols-7 gap-1">
+                {week.map((d) => {
+                  const isToday = d.date === today;
+                  const releaseTitle = releaseByDate.get(d.date);
+                  const dayPieces = piecesByDate.get(d.date) ?? [];
+                  return (
+                    <button
+                      key={d.date}
+                      id={`day-${d.date}`}
+                      onClick={() => setEditing({ date: d.date })}
+                      className={`flex min-h-[96px] flex-col rounded-lg border p-1 text-left transition-colors ${
+                        releaseTitle
+                          ? "border-accent-gold bg-accent-gold/35"
+                          : "border-line bg-surface-secondary hover:bg-surface-accent"
+                      }`}
+                    >
+                      <span
+                        className={`text-[11px] ${
+                          isToday
+                            ? "grid h-5 w-5 place-items-center rounded-full bg-ink font-semibold text-surface-primary"
+                            : "text-ink-soft"
                         }`}
                       >
-                        <span
-                          className={`text-[11px] ${
-                            isToday
-                              ? "grid h-5 w-5 place-items-center rounded-full bg-ink font-semibold text-surface-primary"
-                              : isRelease
-                                ? "font-semibold text-ink"
-                                : "text-ink-soft"
-                          }`}
-                        >
-                          {day}
+                        {d.day}
+                      </span>
+                      {releaseTitle && (
+                        <span className="mt-0.5 line-clamp-2 text-[9px] font-semibold leading-tight text-[#8a6d29]">
+                          ♪ {releaseTitle}
                         </span>
-                        <div className="mt-0.5 space-y-0.5">
-                          {dayPieces.slice(0, 3).map((p) => {
-                            const t = p.typeIds
-                              .map((id) => typeById.get(id))
-                              .filter(Boolean)[0] as ContentType | undefined;
-                            const color = t?.color ?? "#9b8";
-                            const posted = p.links.length > 0;
-                            return (
-                              <span
-                                key={p.id}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditing({ piece: p, date: p.scheduled_date });
-                                }}
-                                className="block truncate rounded px-1 text-[9px] leading-[14px] text-ink"
-                                style={{
-                                  backgroundColor: posted
-                                    ? `${color}D9`
-                                    : `${color}33`,
-                                  border: posted
-                                    ? "none"
-                                    : `1px solid ${color}99`,
-                                }}
-                              >
-                                {t?.name ?? p.song_title ?? "Content"}
-                              </span>
-                            );
-                          })}
-                          {dayPieces.length > 3 && (
-                            <span className="block px-1 text-[9px] text-ink-soft">
-                              +{dayPieces.length - 3}
+                      )}
+                      <div className="mt-0.5 space-y-0.5">
+                        {dayPieces.slice(0, 3).map((p) => {
+                          const t = p.typeIds
+                            .map((id) => typeById.get(id))
+                            .filter(Boolean)[0] as ContentType | undefined;
+                          const color = t?.color ?? "#9b8";
+                          const posted = p.links.length > 0;
+                          return (
+                            <span
+                              key={p.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditing({
+                                  piece: p,
+                                  date: p.scheduled_date,
+                                });
+                              }}
+                              className="block line-clamp-2 rounded px-1 py-0.5 text-[10px] leading-tight text-ink"
+                              style={{
+                                backgroundColor: posted
+                                  ? `${color}D9`
+                                  : `${color}30`,
+                                border: posted ? "none" : `1px solid ${color}99`,
+                              }}
+                            >
+                              {t?.name ?? p.song_title ?? "Content"}
                             </span>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              ))}
+                          );
+                        })}
+                        {dayPieces.length > 3 && (
+                          <span className="block px-1 text-[9px] text-ink-soft">
+                            +{dayPieces.length - 3} more
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {editing && (
@@ -271,6 +296,11 @@ export function ContentView({
           contentTypes={typesProp}
           platforms={platforms}
           onClose={() => setEditing(null)}
+          onSaved={(date) => {
+            setEditing(null);
+            // Return to the day we were just planning.
+            setTimeout(() => scrollToDate(date, false), 60);
+          }}
         />
       )}
     </section>
@@ -294,6 +324,7 @@ function ContentLightbox({
   contentTypes: typesProp,
   platforms,
   onClose,
+  onSaved,
 }: {
   piece?: Piece;
   date: string;
@@ -301,6 +332,7 @@ function ContentLightbox({
   contentTypes: ContentType[];
   platforms: string[];
   onClose: () => void;
+  onSaved: (date: string) => void;
 }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -319,6 +351,15 @@ function ContentLightbox({
   const [songTitle, setSongTitle] = useState("");
 
   const canSave = !!songId && typeIds.length > 0;
+
+  // Lock background scroll while the lightbox is open.
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
 
   function toggle<T>(arr: T[], v: T): T[] {
     return arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
@@ -375,7 +416,7 @@ function ContentLightbox({
       }),
     ).then(() => {
       router.refresh();
-      onClose();
+      onSaved(scheduledDate);
     });
   }
 
@@ -395,7 +436,7 @@ function ContentLightbox({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[90vh] w-full max-w-md flex-col rounded-t-3xl bg-surface-primary shadow-2xl sm:rounded-3xl"
+        className="flex max-h-[90dvh] w-full max-w-md flex-col rounded-t-3xl bg-surface-primary shadow-2xl sm:rounded-3xl"
       >
         <div className="flex items-center justify-between px-6 pt-6">
           <h2 className="font-serif text-2xl text-ink">
@@ -411,7 +452,7 @@ function ContentLightbox({
         </div>
         <p className="px-6 pt-1 text-sm text-ink-soft">{fmtLong(scheduledDate)}</p>
 
-        <div className="mt-4 flex-1 space-y-5 overflow-y-auto px-6 pb-4">
+        <div className="mt-4 flex-1 space-y-5 overflow-y-auto overscroll-contain px-6 pb-4">
           {/* Date */}
           <div>
             <label className="text-xs uppercase tracking-wide text-ink-soft">
@@ -430,36 +471,38 @@ function ContentLightbox({
             <label className="text-xs uppercase tracking-wide text-ink-soft">
               Content type
             </label>
-            <div className="mt-1.5 flex flex-wrap gap-2">
-              {types.map((t) => {
-                const on = typeIds.includes(t.id);
-                return (
-                  <button
-                    key={t.id}
-                    onClick={() => setTypeIds((ids) => toggle(ids, t.id))}
-                    className="rounded-full px-3 py-1.5 text-xs font-medium text-ink transition-all"
-                    style={{
-                      backgroundColor: on ? `${t.color}D9` : `${t.color}26`,
-                      border: `1px solid ${t.color}`,
-                      opacity: on ? 1 : 0.7,
-                    }}
-                  >
-                    {t.name}
-                  </button>
-                );
-              })}
-            </div>
+            {types.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap gap-2">
+                {types.map((t) => {
+                  const on = typeIds.includes(t.id);
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => setTypeIds((ids) => toggle(ids, t.id))}
+                      className="rounded-full px-3 py-1.5 text-xs font-medium text-ink transition-all"
+                      style={{
+                        backgroundColor: on ? `${t.color}D9` : `${t.color}26`,
+                        border: `1px solid ${t.color}`,
+                        opacity: on ? 1 : 0.7,
+                      }}
+                    >
+                      {t.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             <div className="mt-2 flex gap-2">
               <input
                 value={newType}
                 onChange={(e) => setNewType(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && makeType()}
                 placeholder="New type (e.g. car lip-sync)"
-                className="flex-1 rounded-lg border border-line bg-surface-secondary px-3 py-2 text-sm text-ink outline-none focus:border-ink"
+                className="min-w-0 flex-1 rounded-lg border border-line bg-surface-secondary px-3 py-2 text-sm text-ink outline-none focus:border-ink"
               />
               <button
                 onClick={makeType}
-                className="rounded-lg border border-line px-3 py-2 text-sm text-ink"
+                className="shrink-0 rounded-lg border border-line px-4 py-2 text-sm text-ink"
               >
                 Add
               </button>
@@ -479,17 +522,17 @@ function ContentLightbox({
                   onChange={(e) => setSongTitle(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && makeSong()}
                   placeholder="Song title"
-                  className="flex-1 rounded-lg border border-line bg-surface-secondary px-3 py-2 text-sm text-ink outline-none focus:border-ink"
+                  className="min-w-0 flex-1 rounded-lg border border-line bg-surface-secondary px-3 py-2 text-sm text-ink outline-none focus:border-ink"
                 />
                 <button
                   onClick={makeSong}
-                  className="rounded-lg bg-ink px-3 py-2 text-sm text-surface-primary"
+                  className="shrink-0 rounded-lg bg-ink px-3 py-2 text-sm text-surface-primary"
                 >
                   Add
                 </button>
                 <button
                   onClick={() => setAddingSong(false)}
-                  className="rounded-lg px-3 py-2 text-sm text-ink-soft"
+                  className="shrink-0 rounded-lg px-2 py-2 text-sm text-ink-soft"
                 >
                   Cancel
                 </button>
@@ -499,7 +542,7 @@ function ContentLightbox({
                 <select
                   value={songId ?? ""}
                   onChange={(e) => setSongId(e.target.value || null)}
-                  className="flex-1 rounded-xl border border-line bg-surface-secondary px-3 py-2.5 text-ink outline-none focus:border-ink"
+                  className="min-w-0 flex-1 rounded-xl border border-line bg-surface-secondary px-3 py-2.5 text-ink outline-none focus:border-ink"
                 >
                   <option value="">Select a song…</option>
                   {songs.map((s) => (
@@ -567,19 +610,13 @@ function ContentLightbox({
                   key={i}
                   className="rounded-xl border border-line bg-surface-secondary p-3"
                 >
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-2">
                     <input
                       list="platform-list"
                       value={l.platform}
                       onChange={(e) => setLink(i, { platform: e.target.value })}
                       placeholder="Platform"
-                      className="w-32 rounded-lg border border-line bg-surface-primary px-2.5 py-1.5 text-sm text-ink outline-none focus:border-ink"
-                    />
-                    <input
-                      value={l.url}
-                      onChange={(e) => setLink(i, { url: e.target.value })}
-                      placeholder="Link URL"
-                      className="flex-1 rounded-lg border border-line bg-surface-primary px-2.5 py-1.5 text-sm text-ink outline-none focus:border-ink"
+                      className="min-w-0 flex-1 rounded-lg border border-line bg-surface-primary px-2.5 py-1.5 text-sm text-ink outline-none focus:border-ink"
                     />
                     <button
                       onClick={() =>
@@ -591,6 +628,12 @@ function ContentLightbox({
                       <Trash size={16} />
                     </button>
                   </div>
+                  <input
+                    value={l.url}
+                    onChange={(e) => setLink(i, { url: e.target.value })}
+                    placeholder="Link URL"
+                    className="mt-2 w-full min-w-0 rounded-lg border border-line bg-surface-primary px-2.5 py-1.5 text-sm text-ink outline-none focus:border-ink"
+                  />
                   <div className="mt-2 grid grid-cols-5 gap-1.5">
                     {(
                       ["views", "likes", "comments", "shares", "saves"] as const
@@ -608,9 +651,9 @@ function ContentLightbox({
                                 : Number(e.target.value),
                           })
                         }
-                        placeholder={metric[0].toUpperCase() + metric.slice(1)}
+                        placeholder={metric[0].toUpperCase() + metric.slice(1, 3)}
                         title={metric}
-                        className="w-full rounded-md border border-line bg-surface-primary px-1.5 py-1 text-center text-xs text-ink outline-none focus:border-ink"
+                        className="w-full min-w-0 rounded-md border border-line bg-surface-primary px-1 py-1 text-center text-xs text-ink outline-none focus:border-ink"
                       />
                     ))}
                   </div>

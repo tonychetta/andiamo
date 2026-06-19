@@ -31,7 +31,13 @@ export const metadata: Metadata = {
   icons: { apple: "/logo-icon.png" },
 };
 
-export const viewport: Viewport = { themeColor: "#0c0b0a" };
+// maximumScale/userScalable stop iOS Safari from auto-zooming when a small
+// input is focused (which was cutting off buttons in the lightboxes).
+export const viewport: Viewport = {
+  themeColor: "#0c0b0a",
+  maximumScale: 1,
+  userScalable: false,
+};
 
 export default function RootLayout({
   children,
