@@ -90,6 +90,20 @@ function fmtLong(date: string): string {
   });
 }
 
+const WEEKDAY_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+function fmtShort(date: string): string {
+  const [y, m, d] = date.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+}
+function dowOf(date: string): number {
+  const [y, m, d] = date.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+
 export function ContentView({
   today,
   releaseDates,
@@ -108,6 +122,7 @@ export function ContentView({
   const [editing, setEditing] = useState<{ piece?: Piece; date: string } | null>(
     null,
   );
+  const [view, setView] = useState<"monthly" | "weekly">("monthly");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const typeById = useMemo(
@@ -150,13 +165,6 @@ export function ContentView({
     );
   }, [today, releaseDates, pieces]);
 
-  const nextRelease = releaseDates
-    .filter((r) => r.date >= today)
-    .sort((a, b) => a.date.localeCompare(b.date))[0];
-  const prevRelease = releaseDates
-    .filter((r) => r.date < today)
-    .sort((a, b) => b.date.localeCompare(a.date))[0];
-
   function scrollToDate(date: string, smooth = true) {
     const el = document.getElementById(`day-${date}`);
     el?.scrollIntoView({
@@ -164,6 +172,35 @@ export function ContentView({
       block: "center",
     });
   }
+
+  // The date currently centered in the calendar viewport — jumps are relative
+  // to what you're looking at, not to today.
+  function centerDate(): string {
+    const c = scrollRef.current;
+    if (!c) return today;
+    const rect = c.getBoundingClientRect();
+    let el = document.elementFromPoint(
+      rect.left + rect.width / 2,
+      rect.top + rect.height / 2,
+    ) as HTMLElement | null;
+    while (el && !(el.id && el.id.startsWith("day-"))) el = el.parentElement;
+    return el?.id?.replace("day-", "") ?? today;
+  }
+  function jumpNext() {
+    const ref = centerDate();
+    const n = releaseDates
+      .filter((r) => r.date > ref)
+      .sort((a, b) => a.date.localeCompare(b.date))[0];
+    if (n) scrollToDate(n.date);
+  }
+  function jumpPrev() {
+    const ref = centerDate();
+    const p = releaseDates
+      .filter((r) => r.date < ref)
+      .sort((a, b) => b.date.localeCompare(a.date))[0];
+    if (p) scrollToDate(p.date);
+  }
+  const hasReleases = releaseDates.length > 0;
 
   // Land on the current week when the page opens.
   useEffect(() => {
@@ -175,117 +212,223 @@ export function ContentView({
     <section className="flex h-[calc(100dvh-11rem)] flex-col">
       <h1 className="font-serif text-3xl leading-tight text-ink">Content</h1>
 
-      {/* Jump bar — stays put above the scrolling calendar */}
-      <div className="mt-3 flex gap-2">
+      {/* View toggle + view-relative jump bar — stay above the calendar */}
+      <div className="mt-3 flex items-center gap-2">
+        <div className="flex shrink-0 rounded-xl border border-line bg-surface-secondary p-0.5">
+          {(["monthly", "weekly"] as const).map((v) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
+                view === v ? "bg-ink text-surface-primary" : "text-ink-soft"
+              }`}
+            >
+              {v}
+            </button>
+          ))}
+        </div>
         <button
-          onClick={() => prevRelease && scrollToDate(prevRelease.date)}
-          disabled={!prevRelease}
+          onClick={jumpPrev}
+          disabled={!hasReleases}
           className="flex flex-1 items-center justify-center gap-1 rounded-xl border border-line bg-surface-secondary py-2 text-xs text-ink transition-opacity disabled:opacity-40"
         >
-          <CaretLeft size={14} /> Previous release
+          <CaretLeft size={14} /> Prev
         </button>
         <button
-          onClick={() => nextRelease && scrollToDate(nextRelease.date)}
-          disabled={!nextRelease}
+          onClick={jumpNext}
+          disabled={!hasReleases}
           className="flex flex-1 items-center justify-center gap-1 rounded-xl border border-line bg-surface-secondary py-2 text-xs text-ink transition-opacity disabled:opacity-40"
         >
-          Next release <CaretRight size={14} />
+          Next <CaretRight size={14} />
         </button>
       </div>
 
-      <div className="mt-2 grid grid-cols-7 text-center text-[11px] font-medium uppercase tracking-wide text-ink-soft">
-        {WEEKDAYS.map((d, i) => (
-          <div key={i}>{d}</div>
-        ))}
-      </div>
+      {view === "monthly" && (
+        <div className="mt-2 grid grid-cols-7 text-center text-[11px] font-medium uppercase tracking-wide text-ink-soft">
+          {WEEKDAYS.map((d, i) => (
+            <div key={i}>{d}</div>
+          ))}
+        </div>
+      )}
 
-      {/* Scrolling calendar (continuous weeks). overscroll-contain stops the
-          scroll from leaking into the page / a lightbox behind it. */}
+      {/* Scrolling calendar. overscroll-contain stops the scroll from leaking
+          into the page / a lightbox behind it. */}
       <div
         ref={scrollRef}
         className="mt-1 flex-1 space-y-1 overflow-y-auto overscroll-contain pb-6"
       >
-        {weeks.map((week, wi) => {
-          const firstOfMonth = week.find((d) => d.day === 1);
-          return (
-            <div key={wi}>
-              {firstOfMonth && (
-                <div className="px-1 pb-1 pt-2 font-serif text-base text-ink">
-                  {MONTHS[firstOfMonth.month]} {firstOfMonth.year}
+        {view === "monthly"
+          ? weeks.map((week, wi) => {
+              const firstOfMonth = week.find((d) => d.day === 1);
+              return (
+                <div key={wi}>
+                  {firstOfMonth && (
+                    <div className="px-1 pb-1 pt-2 font-serif text-base text-ink">
+                      {MONTHS[firstOfMonth.month]} {firstOfMonth.year}
+                    </div>
+                  )}
+                  <div className="grid grid-cols-7 gap-1">
+                    {week.map((d) => {
+                      const isToday = d.date === today;
+                      const releaseTitle = releaseByDate.get(d.date);
+                      const dayPieces = piecesByDate.get(d.date) ?? [];
+                      return (
+                        <button
+                          key={d.date}
+                          id={`day-${d.date}`}
+                          onClick={() => setEditing({ date: d.date })}
+                          className={`flex min-h-[96px] flex-col rounded-lg border p-1 text-left transition-colors ${
+                            releaseTitle
+                              ? "border-accent-gold bg-accent-gold/35"
+                              : "border-line bg-surface-secondary hover:bg-surface-accent"
+                          }`}
+                        >
+                          <span
+                            className={`text-[11px] ${
+                              isToday
+                                ? "grid h-5 w-5 place-items-center rounded-full bg-ink font-semibold text-surface-primary"
+                                : "text-ink-soft"
+                            }`}
+                          >
+                            {d.day}
+                          </span>
+                          {releaseTitle && (
+                            <span className="mt-0.5 line-clamp-2 text-[9px] font-semibold leading-tight text-[#8a6d29]">
+                              ♪ {releaseTitle}
+                            </span>
+                          )}
+                          <div className="mt-0.5 space-y-0.5">
+                            {dayPieces.slice(0, 3).map((p) => {
+                              const t = p.typeIds
+                                .map((id) => typeById.get(id))
+                                .filter(Boolean)[0] as ContentType | undefined;
+                              const color = t?.color ?? "#9b8";
+                              const posted = p.links.length > 0;
+                              return (
+                                <span
+                                  key={p.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditing({
+                                      piece: p,
+                                      date: p.scheduled_date,
+                                    });
+                                  }}
+                                  className="block line-clamp-2 rounded px-1 py-0.5 text-[10px] leading-tight text-ink"
+                                  style={{
+                                    backgroundColor: posted
+                                      ? `${color}D9`
+                                      : `${color}30`,
+                                    border: posted
+                                      ? "none"
+                                      : `1px solid ${color}99`,
+                                  }}
+                                >
+                                  {t?.name ?? p.song_title ?? "Content"}
+                                </span>
+                              );
+                            })}
+                            {dayPieces.length > 3 && (
+                              <span className="block px-1 text-[9px] text-ink-soft">
+                                +{dayPieces.length - 3} more
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              )}
-              <div className="grid grid-cols-7 gap-1">
-                {week.map((d) => {
-                  const isToday = d.date === today;
-                  const releaseTitle = releaseByDate.get(d.date);
-                  const dayPieces = piecesByDate.get(d.date) ?? [];
-                  return (
-                    <button
-                      key={d.date}
-                      id={`day-${d.date}`}
-                      onClick={() => setEditing({ date: d.date })}
-                      className={`flex min-h-[96px] flex-col rounded-lg border p-1 text-left transition-colors ${
-                        releaseTitle
-                          ? "border-accent-gold bg-accent-gold/35"
-                          : "border-line bg-surface-secondary hover:bg-surface-accent"
-                      }`}
-                    >
-                      <span
-                        className={`text-[11px] ${
-                          isToday
-                            ? "grid h-5 w-5 place-items-center rounded-full bg-ink font-semibold text-surface-primary"
-                            : "text-ink-soft"
+              );
+            })
+          : weeks.map((week, wi) => (
+              <div key={wi} className="mb-2">
+                <div className="px-1 pb-1 pt-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
+                  {fmtShort(week[0].date)} – {fmtShort(week[6].date)}
+                </div>
+                <div className="space-y-1">
+                  {week.map((d) => {
+                    const isToday = d.date === today;
+                    const releaseTitle = releaseByDate.get(d.date);
+                    const dayPieces = piecesByDate.get(d.date) ?? [];
+                    return (
+                      <button
+                        key={d.date}
+                        id={`day-${d.date}`}
+                        onClick={() => setEditing({ date: d.date })}
+                        className={`flex w-full gap-3 rounded-lg border p-2 text-left transition-colors ${
+                          releaseTitle
+                            ? "border-accent-gold bg-accent-gold/25"
+                            : "border-line bg-surface-secondary hover:bg-surface-accent"
                         }`}
                       >
-                        {d.day}
-                      </span>
-                      {releaseTitle && (
-                        <span className="mt-0.5 line-clamp-2 text-[9px] font-semibold leading-tight text-[#8a6d29]">
-                          ♪ {releaseTitle}
-                        </span>
-                      )}
-                      <div className="mt-0.5 space-y-0.5">
-                        {dayPieces.slice(0, 3).map((p) => {
-                          const t = p.typeIds
-                            .map((id) => typeById.get(id))
-                            .filter(Boolean)[0] as ContentType | undefined;
-                          const color = t?.color ?? "#9b8";
-                          const posted = p.links.length > 0;
-                          return (
-                            <span
-                              key={p.id}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditing({
-                                  piece: p,
-                                  date: p.scheduled_date,
-                                });
-                              }}
-                              className="block line-clamp-2 rounded px-1 py-0.5 text-[10px] leading-tight text-ink"
-                              style={{
-                                backgroundColor: posted
-                                  ? `${color}D9`
-                                  : `${color}30`,
-                                border: posted ? "none" : `1px solid ${color}99`,
-                              }}
-                            >
-                              {t?.name ?? p.song_title ?? "Content"}
-                            </span>
-                          );
-                        })}
-                        {dayPieces.length > 3 && (
-                          <span className="block px-1 text-[9px] text-ink-soft">
-                            +{dayPieces.length - 3} more
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
+                        <div className="w-11 shrink-0 text-center">
+                          <div className="text-[10px] uppercase text-ink-soft">
+                            {WEEKDAY_ABBR[dowOf(d.date)]}
+                          </div>
+                          <div
+                            className={`mt-0.5 ${
+                              isToday
+                                ? "mx-auto grid h-7 w-7 place-items-center rounded-full bg-ink text-sm font-semibold text-surface-primary"
+                                : "text-base text-ink"
+                            }`}
+                          >
+                            {d.day}
+                          </div>
+                        </div>
+                        <div className="min-w-0 flex-1 self-center">
+                          {releaseTitle && (
+                            <div className="mb-1 text-xs font-semibold text-[#8a6d29]">
+                              ♪ {releaseTitle}
+                            </div>
+                          )}
+                          {dayPieces.length > 0 ? (
+                            <div className="flex flex-wrap gap-1.5">
+                              {dayPieces.map((p) => {
+                                const t = p.typeIds
+                                  .map((id) => typeById.get(id))
+                                  .filter(Boolean)[0] as ContentType | undefined;
+                                const color = t?.color ?? "#9b8";
+                                const posted = p.links.length > 0;
+                                return (
+                                  <span
+                                    key={p.id}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEditing({
+                                        piece: p,
+                                        date: p.scheduled_date,
+                                      });
+                                    }}
+                                    className="rounded-md px-2 py-1 text-sm text-ink"
+                                    style={{
+                                      backgroundColor: posted
+                                        ? `${color}D9`
+                                        : `${color}30`,
+                                      border: posted
+                                        ? "none"
+                                        : `1px solid ${color}99`,
+                                    }}
+                                  >
+                                    {t?.name ?? p.song_title ?? "Content"}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            !releaseTitle && (
+                              <span className="text-xs text-ink-soft/50">
+                                Tap to plan
+                              </span>
+                            )
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            ))}
       </div>
 
       {editing && (
@@ -638,23 +781,25 @@ function ContentLightbox({
                     {(
                       ["views", "likes", "comments", "shares", "saves"] as const
                     ).map((metric) => (
-                      <input
-                        key={metric}
-                        type="number"
-                        inputMode="numeric"
-                        value={l[metric] ?? ""}
-                        onChange={(e) =>
-                          setLink(i, {
-                            [metric]:
-                              e.target.value === ""
-                                ? null
-                                : Number(e.target.value),
-                          })
-                        }
-                        placeholder={metric[0].toUpperCase() + metric.slice(1, 3)}
-                        title={metric}
-                        className="w-full min-w-0 rounded-md border border-line bg-surface-primary px-1 py-1 text-center text-xs text-ink outline-none focus:border-ink"
-                      />
+                      <div key={metric} className="flex flex-col items-center">
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          value={l[metric] ?? ""}
+                          onChange={(e) =>
+                            setLink(i, {
+                              [metric]:
+                                e.target.value === ""
+                                  ? null
+                                  : Number(e.target.value),
+                            })
+                          }
+                          className="w-full min-w-0 rounded-md border border-line bg-surface-primary px-1 py-1 text-center text-xs text-ink outline-none focus:border-ink"
+                        />
+                        <span className="mt-0.5 text-[9px] capitalize text-ink-soft">
+                          {metric}
+                        </span>
+                      </div>
                     ))}
                   </div>
                 </div>
