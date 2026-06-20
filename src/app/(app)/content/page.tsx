@@ -25,7 +25,7 @@ export default async function ContentPage() {
     supabase
       .from("content_pieces")
       .select(
-        "id, scheduled_date, song_id, notes, song_sections, songs(title), content_piece_types(tag_id), content_links(id, platform, url, views, likes, comments, shares, saves)",
+        "id, scheduled_date, song_id, notes, song_sections, songs(title), content_piece_types(tag_id), content_links(id, platform, url, views, likes, comments, shares, saves, updated_at)",
       )
       .order("scheduled_date", { ascending: true }),
   ]);
@@ -48,6 +48,7 @@ export default async function ContentPage() {
       comments: l.comments,
       shares: l.shares,
       saves: l.saves,
+      updated_at: l.updated_at,
     })),
   }));
 

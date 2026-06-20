@@ -10,6 +10,7 @@ import {
   deleteContentPiece,
   type LinkInput,
 } from "@/app/(app)/content/actions";
+import { PerformanceDashboard } from "./PerformanceDashboard";
 
 type ContentType = { id: string; name: string; color: string };
 type Song = { id: string; title: string; original_release_date?: string | null };
@@ -22,6 +23,7 @@ type LinkData = {
   comments: number | null;
   shares: number | null;
   saves: number | null;
+  updated_at?: string;
 };
 type Piece = {
   id: string;
@@ -123,6 +125,7 @@ export function ContentView({
     null,
   );
   const [view, setView] = useState<"monthly" | "weekly">("weekly");
+  const [mode, setMode] = useState<"calendar" | "dashboard">("calendar");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const typeById = useMemo(
@@ -221,6 +224,18 @@ export function ContentView({
     <section className="flex h-[calc(100dvh-11rem)] flex-col">
       <h1 className="font-serif text-3xl leading-tight text-ink">Content</h1>
 
+      {mode === "dashboard" && (
+        <PerformanceDashboard
+          today={today}
+          pieces={pieces}
+          contentTypes={typesProp}
+          songs={songsProp}
+          onOpenPiece={(p) => setEditing({ piece: p, date: p.scheduled_date })}
+        />
+      )}
+
+      {mode === "calendar" && (
+        <>
       {/* View toggle + view-relative jump bar — stay above the calendar */}
       <div className="mt-3 flex items-center gap-2">
         <div className="flex shrink-0 rounded-xl border border-line bg-surface-secondary p-0.5">
@@ -438,6 +453,23 @@ export function ContentView({
                 </div>
               </div>
             ))}
+      </div>
+        </>
+      )}
+
+      {/* Calendar / Dashboard toggle — bottom of the Content page */}
+      <div className="mt-2 flex rounded-xl border border-line bg-surface-secondary p-0.5">
+        {(["calendar", "dashboard"] as const).map((mo) => (
+          <button
+            key={mo}
+            onClick={() => setMode(mo)}
+            className={`flex-1 rounded-lg py-2 text-sm font-medium capitalize transition-colors ${
+              mode === mo ? "bg-ink text-surface-primary" : "text-ink-soft"
+            }`}
+          >
+            {mo}
+          </button>
+        ))}
       </div>
 
       {editing && (
