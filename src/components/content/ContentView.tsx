@@ -122,7 +122,7 @@ export function ContentView({
   const [editing, setEditing] = useState<{ piece?: Piece; date: string } | null>(
     null,
   );
-  const [view, setView] = useState<"monthly" | "weekly">("monthly");
+  const [view, setView] = useState<"monthly" | "weekly">("weekly");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const typeById = useMemo(
@@ -173,28 +173,36 @@ export function ContentView({
     });
   }
 
-  // The date currently centered in the calendar viewport — jumps are relative
-  // to what you're looking at, not to today.
-  function centerDate(): string {
+  // The date nearest a given fraction down the visible calendar — scanned across
+  // ALL day cells (not a single pixel) so the month grid's middle column can't
+  // throw it off. Jumps use the bottom/top edge of the view so a release that's
+  // currently on-screen is skipped to the FOLLOWING/previous one.
+  function boundaryDate(frac: number): string {
     const c = scrollRef.current;
     if (!c) return today;
     const rect = c.getBoundingClientRect();
-    let el = document.elementFromPoint(
-      rect.left + rect.width / 2,
-      rect.top + rect.height / 2,
-    ) as HTMLElement | null;
-    while (el && !(el.id && el.id.startsWith("day-"))) el = el.parentElement;
-    return el?.id?.replace("day-", "") ?? today;
+    const targetY = rect.top + rect.height * frac;
+    let bestDate = today;
+    let bestDist = Infinity;
+    c.querySelectorAll<HTMLElement>('[id^="day-"]').forEach((el) => {
+      const r = el.getBoundingClientRect();
+      const dist = Math.abs(r.top + r.height / 2 - targetY);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestDate = el.id.replace("day-", "");
+      }
+    });
+    return bestDate;
   }
   function jumpNext() {
-    const ref = centerDate();
+    const ref = boundaryDate(0.85);
     const n = releaseDates
       .filter((r) => r.date > ref)
       .sort((a, b) => a.date.localeCompare(b.date))[0];
     if (n) scrollToDate(n.date);
   }
   function jumpPrev() {
-    const ref = centerDate();
+    const ref = boundaryDate(0.15);
     const p = releaseDates
       .filter((r) => r.date < ref)
       .sort((a, b) => b.date.localeCompare(a.date))[0];
@@ -202,11 +210,12 @@ export function ContentView({
   }
   const hasReleases = releaseDates.length > 0;
 
-  // Land on the current week when the page opens.
+  // Center on today when the page opens and whenever the view is toggled.
   useEffect(() => {
-    scrollToDate(today, false);
+    const t = setTimeout(() => scrollToDate(today, false), 30);
+    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [view]);
 
   return (
     <section className="flex h-[calc(100dvh-11rem)] flex-col">
@@ -215,7 +224,7 @@ export function ContentView({
       {/* View toggle + view-relative jump bar — stay above the calendar */}
       <div className="mt-3 flex items-center gap-2">
         <div className="flex shrink-0 rounded-xl border border-line bg-surface-secondary p-0.5">
-          {(["monthly", "weekly"] as const).map((v) => (
+          {(["weekly", "monthly"] as const).map((v) => (
             <button
               key={v}
               onClick={() => setView(v)}
