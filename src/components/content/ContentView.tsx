@@ -112,14 +112,12 @@ export function ContentView({
   songs: songsProp,
   contentTypes: typesProp,
   pieces,
-  platforms,
 }: {
   today: string;
   releaseDates: ReleaseDate[];
   songs: Song[];
   contentTypes: ContentType[];
   pieces: Piece[];
-  platforms: string[];
 }) {
   const [editing, setEditing] = useState<{ piece?: Piece; date: string } | null>(
     null,
@@ -478,7 +476,6 @@ export function ContentView({
           date={editing.date}
           songs={songsProp}
           contentTypes={typesProp}
-          platforms={platforms}
           onClose={() => setEditing(null)}
           onSaved={(date) => {
             setEditing(null);
@@ -501,12 +498,13 @@ const EMPTY_LINK: LinkData = {
   saves: null,
 };
 
+const PLATFORM_OPTIONS = ["Instagram", "TikTok", "YouTube Shorts", "Facebook"];
+
 function ContentLightbox({
   piece,
   date,
   songs: songsProp,
   contentTypes: typesProp,
-  platforms,
   onClose,
   onSaved,
 }: {
@@ -514,7 +512,6 @@ function ContentLightbox({
   date: string;
   songs: Song[];
   contentTypes: ContentType[];
-  platforms: string[];
   onClose: () => void;
   onSaved: (date: string) => void;
 }) {
@@ -795,13 +792,21 @@ function ContentLightbox({
                   className="rounded-xl border border-line bg-surface-secondary p-3"
                 >
                   <div className="flex items-center gap-2">
-                    <input
-                      list="platform-list"
+                    <select
                       value={l.platform}
                       onChange={(e) => setLink(i, { platform: e.target.value })}
-                      placeholder="Platform"
                       className="min-w-0 flex-1 rounded-lg border border-line bg-surface-primary px-2.5 py-1.5 text-sm text-ink outline-none focus:border-ink"
-                    />
+                    >
+                      <option value="">Platform…</option>
+                      {l.platform && !PLATFORM_OPTIONS.includes(l.platform) && (
+                        <option value={l.platform}>{l.platform}</option>
+                      )}
+                      {PLATFORM_OPTIONS.map((p) => (
+                        <option key={p} value={p}>
+                          {p}
+                        </option>
+                      ))}
+                    </select>
                     <button
                       onClick={() =>
                         setLinks((ls) => ls.filter((_, j) => j !== i))
@@ -845,11 +850,6 @@ function ContentLightbox({
                   </div>
                 </div>
               ))}
-              <datalist id="platform-list">
-                {platforms.map((p) => (
-                  <option key={p} value={p} />
-                ))}
-              </datalist>
               <button
                 onClick={() => setLinks((ls) => [...ls, { ...EMPTY_LINK }])}
                 className="inline-flex items-center gap-1.5 text-sm text-ink-soft transition-colors hover:text-ink"

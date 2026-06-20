@@ -103,32 +103,148 @@ function lastUpdated(pcs: Piece[]): string | null {
   return latest;
 }
 
+// Views dwarf the other metrics, so label every bar: 1,700 → "2k", and small
+// numbers (which have tiny bars) read clearly as the actual value above the bar.
+function fmtBar(v: number): string {
+  if (v <= 0) return "";
+  if (v >= 1000) return `${Math.round(v / 1000)}k`;
+  return String(v);
+}
+
 function MetricGraph({ grid }: { grid: number[][] }) {
   const max = Math.max(1, ...grid.flat());
   return (
-    <div className="mt-3 flex items-end justify-between gap-1">
+    <div className="mt-4 flex items-end justify-between gap-1">
       {METRICS.map((m, mi) => (
         <div key={m} className="flex flex-1 flex-col items-center">
-          <div className="flex h-[110px] items-end gap-[3px]">
+          <div className="flex h-[120px] items-end gap-[3px]">
             {PLATFORMS.map((pl, pi) => {
               const v = grid[mi][pi];
               return (
-                <div
-                  key={pl.label}
-                  title={`${pl.label} · ${METRIC_LABEL[m]}: ${v.toLocaleString()}`}
-                  className="w-2 rounded-t-sm"
-                  style={{
-                    height: `${(v / max) * 110}px`,
-                    minHeight: v > 0 ? 2 : 0,
-                    backgroundColor: pl.color,
-                  }}
-                />
+                <div key={pl.label} className="relative flex items-end">
+                  {v > 0 && (
+                    <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[8px] leading-none text-ink-soft">
+                      {fmtBar(v)}
+                    </span>
+                  )}
+                  <div
+                    title={`${pl.label} · ${METRIC_LABEL[m]}: ${v.toLocaleString()}`}
+                    className="w-2 rounded-t-sm"
+                    style={{
+                      height: `${(v / max) * 96}px`,
+                      minHeight: v > 0 ? 2 : 0,
+                      backgroundColor: pl.color,
+                    }}
+                  />
+                </div>
               );
             })}
           </div>
           <span className="mt-1 text-[9px] text-ink-soft">{METRIC_LABEL[m]}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+// One content-type graph, with its own Song-Section dropdown that lists ONLY the
+// sections this type's content actually uses (in the current filter).
+function TypeGraphCard({
+  type,
+  pcs,
+  recent3,
+  updated,
+  isLeader,
+  onOpenPiece,
+}: {
+  type: ContentType;
+  pcs: Piece[];
+  recent3: Piece[];
+  updated: string | null;
+  isLeader: boolean;
+  onOpenPiece: (p: Piece) => void;
+}) {
+  const [section, setSection] = useState("all");
+  const [openDot, setOpenDot] = useState(false);
+
+  const available = SECTIONS.filter((s) =>
+    pcs.some((p) => p.sections.includes(s)),
+  );
+  const shown =
+    section === "all" || !available.includes(section)
+      ? pcs
+      : pcs.filter((p) => p.sections.includes(section));
+  const grid = aggregate(shown);
+
+  return (
+    <div className="rounded-2xl border border-line bg-surface-secondary p-4">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span
+            className="inline-block h-3 w-3 rounded-full"
+            style={{ backgroundColor: type.color }}
+          />
+          <span className="font-medium text-ink">{type.name}</span>
+          {isLeader && (
+            <button
+              onClick={() => setOpenDot((o) => !o)}
+              aria-label="Rising — recent pieces"
+              className="grid h-4 w-4 place-items-center"
+            >
+              <span className="h-2.5 w-2.5 rounded-full bg-red-600 shadow-[0_0_6px_rgba(220,38,38,0.7)]" />
+            </button>
+          )}
+        </div>
+        {updated && (
+          <span className="text-[10px] text-ink-soft">
+            Updated {fmtUpdated(updated)}
+          </span>
+        )}
+      </div>
+
+      {available.length > 0 && (
+        <div className="mt-2 flex items-center gap-2">
+          <span className="text-[11px] text-ink-soft">Section</span>
+          <select
+            value={section}
+            onChange={(e) => setSection(e.target.value)}
+            className="rounded-lg border border-line bg-surface-primary px-2 py-1 text-xs text-ink outline-none focus:border-ink"
+          >
+            <option value="all">All sections</option>
+            {available.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {isLeader && openDot && (
+        <div className="mt-2 rounded-xl bg-surface-primary p-2">
+          <p className="mb-1 text-[11px] text-ink-soft">Rising — 3 most recent:</p>
+          <div className="flex flex-wrap gap-1.5">
+            {recent3.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => onOpenPiece(p)}
+                className="rounded-md px-2 py-1 text-xs text-ink"
+                style={{ backgroundColor: `${type.color}33` }}
+              >
+                {p.song_title ?? "Content"} · {p.scheduled_date.slice(5)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {shown.length === 0 ? (
+        <p className="mt-3 text-xs text-ink-soft">
+          No content for {section} in this range.
+        </p>
+      ) : (
+        <MetricGraph grid={grid} />
+      )}
     </div>
   );
 }
@@ -148,8 +264,6 @@ export function PerformanceDashboard({
 }) {
   const [songId, setSongId] = useState<string>("all");
   const [range, setRange] = useState<string>("12w");
-  const [section, setSection] = useState<string>("Chorus 1");
-  const [openDot, setOpenDot] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const r = RANGES.find((x) => x.key === range);
@@ -183,7 +297,6 @@ export function PerformanceDashboard({
           recent3: recent.slice(0, 3),
           recentAvg,
           rising: recent.length >= 3 && recentAvg > prevAvg,
-          grid: aggregate(pcs),
           updated: lastUpdated(pcs),
         };
       })
@@ -193,7 +306,6 @@ export function PerformanceDashboard({
       recent3: Piece[];
       recentAvg: number;
       rising: boolean;
-      grid: number[][];
       updated: string | null;
     }[];
     out.sort((a, b) => b.recentAvg - a.recentAvg);
@@ -202,9 +314,6 @@ export function PerformanceDashboard({
 
   // Only the top (leading) graph shows the rising dot, if it's actually rising.
   const leaderId = typeGraphs[0]?.rising ? typeGraphs[0].type.id : null;
-
-  const sectionPcs = filtered.filter((p) => p.sections.includes(section));
-  const sectionGrid = aggregate(sectionPcs);
 
   return (
     <div className="flex-1 overflow-y-auto overscroll-contain pb-6">
@@ -242,7 +351,10 @@ export function PerformanceDashboard({
       {/* Platform legend */}
       <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1">
         {PLATFORMS.map((pl) => (
-          <span key={pl.label} className="flex items-center gap-1 text-[10px] text-ink-soft">
+          <span
+            key={pl.label}
+            className="flex items-center gap-1 text-[10px] text-ink-soft"
+          >
             <span
               className="inline-block h-2.5 w-2.5 rounded-sm"
               style={{ backgroundColor: pl.color }}
@@ -260,85 +372,16 @@ export function PerformanceDashboard({
       ) : (
         <div className="mt-4 space-y-4">
           {typeGraphs.map((g) => (
-            <div
+            <TypeGraphCard
               key={g.type.id}
-              className="rounded-2xl border border-line bg-surface-secondary p-4"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <span
-                    className="inline-block h-3 w-3 rounded-full"
-                    style={{ backgroundColor: g.type.color }}
-                  />
-                  <span className="font-medium text-ink">{g.type.name}</span>
-                  {g.type.id === leaderId && (
-                    <button
-                      onClick={() =>
-                        setOpenDot(openDot === g.type.id ? null : g.type.id)
-                      }
-                      aria-label="Rising — recent pieces"
-                      className="grid h-4 w-4 place-items-center"
-                    >
-                      <span className="h-2.5 w-2.5 rounded-full bg-red-600 shadow-[0_0_6px_rgba(220,38,38,0.7)]" />
-                    </button>
-                  )}
-                </div>
-                {g.updated && (
-                  <span className="text-[10px] text-ink-soft">
-                    Updated {fmtUpdated(g.updated)}
-                  </span>
-                )}
-              </div>
-
-              {g.type.id === leaderId && openDot === g.type.id && (
-                <div className="mt-2 rounded-xl bg-surface-primary p-2">
-                  <p className="mb-1 text-[11px] text-ink-soft">
-                    Rising — 3 most recent:
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {g.recent3.map((p) => (
-                      <button
-                        key={p.id}
-                        onClick={() => onOpenPiece(p)}
-                        className="rounded-md px-2 py-1 text-xs text-ink"
-                        style={{ backgroundColor: `${g.type.color}33` }}
-                      >
-                        {p.song_title ?? "Content"} ·{" "}
-                        {p.scheduled_date.slice(5)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <MetricGraph grid={g.grid} />
-            </div>
+              type={g.type}
+              pcs={g.pcs}
+              recent3={g.recent3}
+              updated={g.updated}
+              isLeader={g.type.id === leaderId}
+              onOpenPiece={onOpenPiece}
+            />
           ))}
-
-          {/* Song Section graph */}
-          <div className="rounded-2xl border border-line bg-surface-secondary p-4">
-            <div className="flex items-center justify-between gap-2">
-              <span className="font-medium text-ink">Song section</span>
-              <select
-                value={section}
-                onChange={(e) => setSection(e.target.value)}
-                className="rounded-lg border border-line bg-surface-primary px-2 py-1 text-xs text-ink outline-none focus:border-ink"
-              >
-                {SECTIONS.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {sectionPcs.length === 0 ? (
-              <p className="mt-3 text-xs text-ink-soft">
-                No content tagged with {section} in this range.
-              </p>
-            ) : (
-              <MetricGraph grid={sectionGrid} />
-            )}
-          </div>
         </div>
       )}
     </div>

@@ -52,20 +52,6 @@ export default async function ContentPage() {
     })),
   }));
 
-  // Platform suggestions: the common defaults plus any the artist has used.
-  const used = new Set<string>();
-  for (const p of piecesData)
-    for (const l of p.links) if (l.platform) used.add(l.platform);
-  const platforms = Array.from(
-    new Set([
-      "Instagram",
-      "TikTok",
-      "YouTube Shorts",
-      "Facebook",
-      ...Array.from(used),
-    ]),
-  );
-
   const today = new Date().toISOString().slice(0, 10);
 
   return (
@@ -79,7 +65,6 @@ export default async function ContentPage() {
       songs={songs ?? []}
       contentTypes={contentTypes ?? []}
       pieces={piecesData}
-      platforms={platforms}
     />
   );
 }
