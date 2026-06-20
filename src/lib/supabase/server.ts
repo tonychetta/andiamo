@@ -21,7 +21,11 @@ export async function createClient() {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options),
+              cookieStore.set(name, value, {
+                ...options,
+                // Persist across app closes if no long expiry was provided.
+                maxAge: options?.maxAge ?? 60 * 60 * 24 * 400,
+              }),
             );
           } catch {
             // Called from a Server Component, which can't write cookies.
