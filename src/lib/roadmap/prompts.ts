@@ -6,6 +6,13 @@ export const ROADMAP_MODEL = "claude-opus-4-8";
 
 export const MILESTONE_GEN_SYSTEM = `You are Andiamo's roadmap planner. Given an artist's Vision and ONE of their long-term Goals, generate exactly 5 starter Milestones that lay a realistic path from where they are today to that Goal.
 
+# The 3-Legged Stool
+Andiamo grows artists on three legs, and each Goal category is driven by ONE leg's strategy:
+- AUDIENCE Goal → POTENTIAL FANS. They want to be entertained and feel the pride of early discovery. Purpose: top-of-funnel discovery and audience-data capture. Method: viral/entertainment content research and planning aligned to the artist's brand. Milestones MUST align with the brand, sound, and the kinds of content the artist said they LIKE to make (and avoid what they said they dislike).
+- REVENUE Goal → CURRENT FANS. They want a real relationship with the artist, to be seen and understood, and to feel part of a movement they're helping build. Purpose: middle-of-funnel for fans, bottom-of-funnel for superfans — relationship-building, audience-data refinement, and revenue. Method: data-backed content planning, email/SMS exclusives, direct-to-fan campaigns. Milestones MUST relate to the superfan group the artist described.
+- TEAM Goal → INDUSTRY BUZZ. Industry people want to make money WITH the artist by providing real value. Purpose: opportunities and value-creation by being resourceful to others. Method: platforming other artists/collaborators, networking events, PR around releases and wins. Milestones MUST help build the specific team the artist described AND create the conditions that lead to their large, long-term, gate-kept goals (touring, label deals, etc.).
+The context tells you which Goal/leg you're planning for — focus on that leg's strategy.
+
 Rules:
 - Each Milestone is specific enough to derive concrete Tasks from, and time-bound (include a rough timeframe or year). ALL timeframes must be in the FUTURE relative to the current date given in the context.
 - Calibrate to the artist's CURRENT starting line from the conversation (their current shows, audience size, team, runway) — not generic advice. Milestone 1 should be a realistic near-term next step from where they are now.
@@ -71,6 +78,15 @@ const CATEGORY_LABEL: Record<string, string> = {
   recognition_awards: "Recognition",
 };
 
+// The 3-Legged Stool focus for the specific Goal being planned.
+const LEG_FOCUS: Record<string, string> = {
+  audience_size:
+    "LEG FOCUS — POTENTIAL FANS (top-of-funnel discovery + audience-data capture). Build Milestones around viral/entertainment content and audience growth that ALIGN with the brand, sound, and content types the artist said they like to make (and avoid what they said they dislike).",
+  revenue_generating:
+    "LEG FOCUS — CURRENT FANS (relationship-building + revenue from fans and superfans). Build Milestones around data-backed content, email/SMS exclusives, and direct-to-fan campaigns that RELATE to the specific superfan group the artist described.",
+  team: "LEG FOCUS — INDUSTRY BUZZ (opportunities by providing value to industry people). Build Milestones around platforming collaborators, networking, and PR that BUILD the specific team the artist described AND create the conditions leading to their large, long-term, gate-kept goals (touring, label deals, etc.).",
+};
+
 type Turn = { role: string; content: string };
 
 function flattenTranscript(messages: Turn[]): string {
@@ -94,6 +110,8 @@ ${opts.statement}
 
 THE GOAL to plan Milestones for (${CATEGORY_LABEL[opts.goalCategory] ?? opts.goalCategory}):
 ${opts.goalDescription}
+
+${LEG_FOCUS[opts.goalCategory] ?? ""}
 
 THE ARTIST'S CONVERSATION (use this for their current starting line and context):
 ${flattenTranscript(opts.transcript)}`;
