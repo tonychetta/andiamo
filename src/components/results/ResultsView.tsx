@@ -26,7 +26,7 @@ const SOCIAL = [
 ];
 const DSP = [
   { key: "spotify_followers", label: "Spotify · Followers", color: "#1DB954" },
-  { key: "spotify_monthly_listeners", label: "Spotify · Monthly Listeners", color: "#1DB954" },
+  { key: "spotify_monthly_listeners", label: "Spotify · Monthly Active Listeners", color: "#1DB954" },
   { key: "apple_followers", label: "Apple Music · Followers", color: "#FC3C44" },
   { key: "apple_monthly_listeners", label: "Apple Music · Monthly Listeners", color: "#FC3C44" },
 ];
@@ -179,8 +179,8 @@ function MetricCard({
 
       {editing && (
         <div className="mt-3 space-y-2 rounded-xl bg-surface-primary p-3">
-          <div className="flex items-end gap-2">
-            <div className="flex-1">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
               <label className="text-[10px] uppercase tracking-wide text-ink-soft">
                 Week
               </label>
@@ -188,10 +188,10 @@ function MetricCard({
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="mt-0.5 w-full rounded-lg border border-line bg-surface-secondary px-2 py-1.5 text-sm text-ink outline-none focus:border-ink"
+                className="mt-0.5 h-10 w-full rounded-lg border border-line bg-surface-secondary px-2 text-sm text-ink outline-none focus:border-ink"
               />
             </div>
-            <div className="flex-1">
+            <div>
               <label className="text-[10px] uppercase tracking-wide text-ink-soft">
                 Value
               </label>
@@ -201,16 +201,16 @@ function MetricCard({
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
                 placeholder="e.g. 12500"
-                className="mt-0.5 w-full rounded-lg border border-line bg-surface-secondary px-2 py-1.5 text-sm text-ink outline-none focus:border-ink"
+                className="mt-0.5 h-10 w-full rounded-lg border border-line bg-surface-secondary px-2 text-sm text-ink outline-none focus:border-ink"
               />
             </div>
-            <button
-              onClick={add}
-              className="rounded-lg bg-ink px-3 py-1.5 text-sm text-surface-primary"
-            >
-              Save
-            </button>
           </div>
+          <button
+            onClick={add}
+            className="w-full rounded-lg bg-ink py-2 text-sm text-surface-primary"
+          >
+            Save
+          </button>
 
           {entries.length > 0 && (
             <div className="max-h-32 space-y-1 overflow-y-auto pt-1">
@@ -384,8 +384,8 @@ export function ResultsView({
               </option>
             ))}
           </select>
-          <div className="flex items-end gap-2">
-            <div className="flex-1">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
               <label className="text-[10px] uppercase tracking-wide text-ink-soft">
                 Week
               </label>
@@ -393,10 +393,10 @@ export function ResultsView({
                 type="date"
                 value={newSongDate}
                 onChange={(e) => setNewSongDate(e.target.value)}
-                className="mt-0.5 w-full rounded-lg border border-line bg-surface-primary px-2 py-1.5 text-sm text-ink outline-none focus:border-ink"
+                className="mt-0.5 h-10 w-full rounded-lg border border-line bg-surface-primary px-2 text-sm text-ink outline-none focus:border-ink"
               />
             </div>
-            <div className="flex-1">
+            <div>
               <label className="text-[10px] uppercase tracking-wide text-ink-soft">
                 Streams
               </label>
@@ -405,16 +405,16 @@ export function ResultsView({
                 inputMode="numeric"
                 value={newSongValue}
                 onChange={(e) => setNewSongValue(e.target.value)}
-                className="mt-0.5 w-full rounded-lg border border-line bg-surface-primary px-2 py-1.5 text-sm text-ink outline-none focus:border-ink"
+                className="mt-0.5 h-10 w-full rounded-lg border border-line bg-surface-primary px-2 text-sm text-ink outline-none focus:border-ink"
               />
             </div>
-            <button
-              onClick={addSongStream}
-              className="rounded-lg bg-ink px-3 py-1.5 text-sm text-surface-primary"
-            >
-              Track
-            </button>
           </div>
+          <button
+            onClick={addSongStream}
+            className="w-full rounded-lg bg-ink py-2 text-sm text-surface-primary"
+          >
+            Track
+          </button>
         </div>
       )}
 
