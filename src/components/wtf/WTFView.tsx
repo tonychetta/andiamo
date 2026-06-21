@@ -74,7 +74,7 @@ export function WTFView({
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState<string | null>(null);
+  const [sent, setSent] = useState<null | "ok" | "no-email">(null);
   const [showHistory, setShowHistory] = useState(false);
 
   function run(fn: () => Promise<unknown>) {
@@ -89,11 +89,7 @@ export function WTFView({
     setSent(null);
     generateWtf().then((r) => {
       setSending(false);
-      setSent(
-        r.emailed
-          ? "Generated and emailed."
-          : "Generated. (Email didn't send — check the email setup.)",
-      );
+      setSent(r.emailed ? "ok" : "no-email");
       router.refresh();
     });
   }
@@ -194,11 +190,22 @@ export function WTFView({
         <button
           onClick={generate}
           disabled={sending || empty}
-          className="w-full rounded-xl bg-ink py-3 font-medium text-surface-primary transition-opacity hover:opacity-90 disabled:opacity-50"
+          className="w-full rounded-xl bg-accent-cyan py-3 font-medium text-ink transition-opacity hover:opacity-90 disabled:opacity-50"
         >
-          {sending ? "Generating…" : "Generate Weekly Task Form"}
+          {sending
+            ? "Sending…"
+            : sent === "ok"
+              ? "WTF Sent ✓"
+              : sent === "no-email"
+                ? "WTF Sent · email failed"
+                : "Generate Weekly Task Form"}
         </button>
-        {sent && <p className="mt-2 text-center text-sm text-ink-soft">{sent}</p>}
+        {sent === "no-email" && (
+          <p className="mt-2 text-center text-xs text-ink-soft">
+            Saved, but the email didn&apos;t send. Check the recipient&apos;s
+            email address.
+          </p>
+        )}
       </div>
 
       {/* History */}

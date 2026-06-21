@@ -25,6 +25,12 @@ export async function generateWtf(): Promise<{ ok: boolean; emailed: boolean }> 
   const { start, end } = weekBounds(today);
   const compiled = await compileWtf(supabase, start, end);
 
+  // One snapshot per week — re-generating replaces it.
+  await supabase
+    .from("wtfs")
+    .delete()
+    .eq("artist_id", aid as string)
+    .eq("week_start", start);
   await supabase.from("wtfs").insert({
     artist_id: aid as string,
     week_start: start,
@@ -47,12 +53,6 @@ export async function generateWtf(): Promise<{ ok: boolean; emailed: boolean }> 
     });
     emailed = r.ok;
   }
-
-  // Clear the swipes — each week is an explicit re-commitment (Section 14.3).
-  await supabase
-    .from("tasks")
-    .update({ on_wtf: false, wtf_priority: false })
-    .or("on_wtf.eq.true,wtf_priority.eq.true");
 
   revalidatePath("/wtf");
   revalidatePath("/roadmap");

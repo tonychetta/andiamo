@@ -118,7 +118,7 @@ export function RoadmapView({
     <div>
       <VisionHeaderBar statement={visionStatement} />
 
-      <div className="mb-4 flex justify-end">
+      <div className="mb-4 flex justify-center">
         <Link
           href="/wtf"
           className="inline-flex items-center gap-1.5 rounded-full bg-ink px-4 py-2 text-sm font-medium text-surface-primary transition-opacity hover:opacity-90"

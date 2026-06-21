@@ -8,7 +8,7 @@ export async function sendEmail(opts: {
 }): Promise<{ ok: boolean; error?: string }> {
   const key = process.env.RESEND_API_KEY;
   if (!key || !opts.to) return { ok: false, error: "missing key or recipient" };
-  const from = process.env.WTF_EMAIL_FROM || "Andiamo <hello@andiamodev.com>";
+  const from = process.env.WTF_EMAIL_FROM || "Andiamo <wtf@andiamodev.com>";
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
