@@ -48,7 +48,7 @@ export default async function RoadmapPage() {
       supabase
         .from("tasks")
         .select(
-          "id, milestone_id, description, display_order, is_completed, status, parent_task_id",
+          "id, milestone_id, description, display_order, is_completed, status, parent_task_id, on_wtf, wtf_priority",
         )
         .order("display_order", { ascending: true }),
     ]);
@@ -87,6 +87,8 @@ export default async function RoadmapPage() {
         is_completed: t.is_completed,
         status: t.status,
         parent_task_id: t.parent_task_id,
+        on_wtf: t.on_wtf,
+        wtf_priority: t.wtf_priority,
       })),
     })),
   }));

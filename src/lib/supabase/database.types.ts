@@ -707,9 +707,11 @@ export type Database = {
           is_completed: boolean
           is_recurring: boolean
           milestone_id: string | null
+          on_wtf: boolean
           parent_task_id: string | null
           status: Database["public"]["Enums"]["task_status"]
           updated_at: string
+          wtf_priority: boolean
         }
         Insert: {
           artist_id: string
@@ -722,9 +724,11 @@ export type Database = {
           is_completed?: boolean
           is_recurring?: boolean
           milestone_id?: string | null
+          on_wtf?: boolean
           parent_task_id?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           updated_at?: string
+          wtf_priority?: boolean
         }
         Update: {
           artist_id?: string
@@ -737,9 +741,11 @@ export type Database = {
           is_completed?: boolean
           is_recurring?: boolean
           milestone_id?: string | null
+          on_wtf?: boolean
           parent_task_id?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           updated_at?: string
+          wtf_priority?: boolean
         }
         Relationships: [
           {
@@ -835,6 +841,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "visions_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "artists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wtfs: {
+        Row: {
+          artist_id: string
+          created_at: string
+          generated_at: string
+          id: string
+          payload: Json
+          status: string
+          week_start: string
+        }
+        Insert: {
+          artist_id: string
+          created_at?: string
+          generated_at?: string
+          id?: string
+          payload?: Json
+          status?: string
+          week_start: string
+        }
+        Update: {
+          artist_id?: string
+          created_at?: string
+          generated_at?: string
+          id?: string
+          payload?: Json
+          status?: string
+          week_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wtfs_artist_id_fkey"
             columns: ["artist_id"]
             isOneToOne: false
             referencedRelation: "artists"

@@ -223,6 +223,37 @@ export async function reorderMilestones(
   revalidatePath("/roadmap");
 }
 
+// ---------- Weekly Task Form (WTF) ----------
+
+// Swipe a Milestone Task onto (or off of) the current week's WTF.
+export async function setTaskOnWtf(taskId: string, on: boolean) {
+  const supabase = await createClient();
+  const patch = on ? { on_wtf: true } : { on_wtf: false, wtf_priority: false };
+  const { error } = await supabase.from("tasks").update(patch).eq("id", taskId);
+  if (error) throw new Error(error.message);
+  revalidatePath("/roadmap");
+  revalidatePath("/wtf");
+}
+
+// Name a task the week's Priority — one per artist (clears any other); it must
+// also be on the WTF.
+export async function setTaskPriority(taskId: string) {
+  const { supabase, artistId: aid } = await artistId();
+  if (!aid) return;
+  await supabase
+    .from("tasks")
+    .update({ wtf_priority: false })
+    .eq("artist_id", aid)
+    .eq("wtf_priority", true);
+  const { error } = await supabase
+    .from("tasks")
+    .update({ wtf_priority: true, on_wtf: true })
+    .eq("id", taskId);
+  if (error) throw new Error(error.message);
+  revalidatePath("/roadmap");
+  revalidatePath("/wtf");
+}
+
 // Make a task depend on another (parent) task, or clear it (parentId null).
 export async function setTaskDependency(
   taskId: string,

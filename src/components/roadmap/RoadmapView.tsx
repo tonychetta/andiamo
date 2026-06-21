@@ -7,6 +7,7 @@ import {
   useState,
   useTransition,
 } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   motion,
@@ -22,6 +23,7 @@ import {
   LockSimple,
   CaretDown,
   CaretUp,
+  CalendarCheck,
 } from "@phosphor-icons/react";
 import {
   addTask,
@@ -35,6 +37,7 @@ import {
   deleteMilestone,
   reorderMilestones,
   addSuggestedTasks,
+  setTaskOnWtf,
 } from "@/app/(app)/roadmap/actions";
 
 type TaskStatus = "pending" | "completed" | "pushed" | "complete_and_push";
@@ -44,6 +47,8 @@ type Task = {
   is_completed: boolean;
   status: TaskStatus;
   parent_task_id: string | null;
+  on_wtf: boolean;
+  wtf_priority: boolean;
 };
 type Milestone = {
   id: string;
@@ -112,6 +117,15 @@ export function RoadmapView({
   return (
     <div>
       <VisionHeaderBar statement={visionStatement} />
+
+      <div className="mb-4 flex justify-end">
+        <Link
+          href="/wtf"
+          className="inline-flex items-center gap-1.5 rounded-full bg-ink px-4 py-2 text-sm font-medium text-surface-primary transition-opacity hover:opacity-90"
+        >
+          <CalendarCheck size={16} /> This Week
+        </Link>
+      </div>
 
       <div
         ref={trackRef}
@@ -861,10 +875,25 @@ function TaskRow({
 
   return (
     <div
-      className={`relative flex items-start gap-2 py-1.5 ${indented ? "ml-7" : ""} ${
-        locked ? "opacity-50" : ""
-      }`}
+      className={`relative ${indented ? "ml-7" : ""} ${locked ? "opacity-50" : ""}`}
     >
+      {/* Swipe-to-WTF hints, revealed as the row slides. */}
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-between px-1 text-[11px] font-medium uppercase tracking-wide">
+        <span className="text-accent-cyan">→ This Week</span>
+        <span className="text-ink-soft">Remove ←</span>
+      </div>
+      <motion.div
+        drag={editing ? false : "x"}
+        dragConstraints={{ left: 0, right: 0 }}
+        dragElastic={0.6}
+        onDragEnd={(_e, info) => {
+          if (info.offset.x > 70 && !task.on_wtf)
+            run(() => setTaskOnWtf(task.id, true));
+          else if (info.offset.x < -70 && task.on_wtf)
+            run(() => setTaskOnWtf(task.id, false));
+        }}
+        className="relative flex items-start gap-2 bg-surface-secondary py-1.5"
+      >
       {editing ? (
         <textarea
           ref={taRef}
@@ -910,6 +939,12 @@ function TaskRow({
               className="ml-1.5 inline align-middle text-ink-soft"
             />
           )}
+        </span>
+      )}
+
+      {task.on_wtf && (
+        <span className="mt-0.5 shrink-0 rounded bg-accent-cyan/25 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink">
+          {task.wtf_priority ? "★ WTF" : "WTF"}
         </span>
       )}
 
@@ -1002,6 +1037,7 @@ function TaskRow({
           </div>
         </>
       )}
+      </motion.div>
     </div>
   );
 }
