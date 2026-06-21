@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { SignOut } from "@phosphor-icons/react/dist/ssr";
 import { createClient } from "@/lib/supabase/server";
 import { Logo } from "@/components/Logo";
+import { ArtistCard } from "@/components/coach/ArtistCard";
+import { AssignArtist } from "@/components/coach/AssignArtist";
 import { signOut } from "./actions";
 
 export default async function Home() {
@@ -19,6 +21,12 @@ export default async function Home() {
 
   // Artists live in the bottom-nav app shell; only coaches see this portal.
   if (profile?.account_type !== "coach") redirect("/vision");
+
+  // Roster: RLS returns only the artists assigned to this coach.
+  const { data: roster } = await supabase
+    .from("artists")
+    .select("id, artist_name, tier, status")
+    .order("artist_name", { ascending: true });
 
   const name = profile?.name?.trim() || "there";
   const initial = (profile?.name?.trim()?.[0] || "A").toUpperCase();
@@ -57,18 +65,34 @@ export default async function Home() {
           <h1 className="mt-4 font-serif text-4xl leading-tight text-ink md:text-5xl">
             Welcome, {name}.
           </h1>
-          <p className="mt-5 max-w-xl text-lg leading-relaxed text-ink-soft">
-            Your roster and the artists awaiting a match will live here. We build
-            the Coach Portal next.
-          </p>
         </section>
 
-        <section className="mt-12 rounded-2xl border border-dashed border-line p-8 text-center">
-          <p className="font-serif text-xl text-ink">Your roster</p>
-          <p className="mt-2 text-sm text-ink-soft">
-            Artist cards, the new-artist matching feed, and invite codes arrive
-            with the Coach Portal build.
-          </p>
+        <section className="mt-10">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-serif text-2xl text-ink">Your roster</h2>
+            <AssignArtist />
+          </div>
+
+          {roster && roster.length > 0 ? (
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              {roster.map((a) => (
+                <ArtistCard
+                  key={a.id}
+                  id={a.id}
+                  name={a.artist_name || "Unnamed artist"}
+                  tier={a.tier}
+                  status={a.status}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="mt-5 rounded-2xl border border-dashed border-line p-8 text-center">
+              <p className="text-ink">No artists yet.</p>
+              <p className="mt-1 text-sm text-ink-soft">
+                Use “Add an artist” to link one by their account email.
+              </p>
+            </div>
+          )}
         </section>
       </main>
     </div>

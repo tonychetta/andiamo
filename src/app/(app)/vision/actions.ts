@@ -12,6 +12,14 @@ import { createClient } from "@/lib/supabase/server";
 
 export async function updateVisionStatement(visionId: string, text: string) {
   const supabase = await createClient();
+  // The Vision Statement is the artist's sacred space — a coach viewing the
+  // artist can't edit it (Section 5.1). Only the artist (their own row) may.
+  const { data: claims } = await supabase.auth.getClaims();
+  const uid = claims?.claims?.sub;
+  const { data: ownArtist } = uid
+    ? await supabase.from("artists").select("id").eq("user_id", uid).maybeSingle()
+    : { data: null };
+  if (!ownArtist) return;
   const { error } = await supabase
     .from("visions")
     .update({ statement_text: text.trim() })

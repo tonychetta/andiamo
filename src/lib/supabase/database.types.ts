@@ -74,6 +74,32 @@ export type Database = {
           },
         ]
       }
+      coach_active_artist: {
+        Row: {
+          artist_id: string
+          coach_user_id: string
+          updated_at: string
+        }
+        Insert: {
+          artist_id: string
+          coach_user_id: string
+          updated_at?: string
+        }
+        Update: {
+          artist_id?: string
+          coach_user_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_active_artist_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "artists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       coaches: {
         Row: {
           bio: string | null
