@@ -7,6 +7,16 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database } from "@/lib/supabase/database.types";
 
 type ArtistStatus = Database["public"]["Enums"]["artist_status"];
+type ArtistTier = Database["public"]["Enums"]["artist_tier"];
+
+// Readable code, no ambiguous characters.
+function randomCode(): string {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let s = "";
+  for (let i = 0; i < 8; i++)
+    s += alphabet[Math.floor(Math.random() * alphabet.length)];
+  return s;
+}
 
 async function coachContext() {
   const supabase = await createClient();
@@ -91,5 +101,78 @@ export async function assignArtistByEmail(
     .eq("id", artist.id);
   if (error) return { ok: false, error: error.message };
   revalidatePath("/");
+  return { ok: true };
+}
+
+// ---------- Invite codes (Section 5.3) ----------
+
+export async function generateInviteCode(
+  tier: ArtistTier,
+  billingBypass: boolean,
+): Promise<{ ok: boolean; code?: string; error?: string }> {
+  const { supabase, coachId } = await coachContext();
+  if (!coachId) return { ok: false, error: "Not a coach." };
+  const code = randomCode();
+  const { error } = await supabase.from("invite_codes").insert({
+    coach_id: coachId,
+    code,
+    tier,
+    billing_bypass: billingBypass,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/");
+  return { ok: true, code };
+}
+
+export async function deleteInviteCode(id: string) {
+  const { supabase, coachId } = await coachContext();
+  if (!coachId) return;
+  await supabase.from("invite_codes").delete().eq("id", id);
+  revalidatePath("/");
+}
+
+// Redeem a code on the signed-in artist's account: assign to the coach + set
+// tier/comp + mark used. Admin client (the artist can't read others' codes).
+export async function redeemInviteCode(
+  code: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  const uid = claims?.claims?.sub as string | undefined;
+  if (!uid) return { ok: false, error: "Not signed in." };
+  const clean = code.trim().toUpperCase();
+  if (!clean) return { ok: false, error: "Enter a code." };
+
+  const admin = createAdminClient();
+  const { data: ic } = await admin
+    .from("invite_codes")
+    .select("id, coach_id, tier, billing_bypass, used_by, expires_at")
+    .eq("code", clean)
+    .maybeSingle();
+  if (!ic) return { ok: false, error: "Invalid invite code." };
+  if (ic.used_by) return { ok: false, error: "This code has already been used." };
+  if (new Date(ic.expires_at) < new Date())
+    return { ok: false, error: "This code has expired." };
+
+  const { data: artist } = await admin
+    .from("artists")
+    .select("id")
+    .eq("user_id", uid)
+    .maybeSingle();
+  if (!artist) return { ok: false, error: "Only artist accounts can use a code." };
+
+  await admin
+    .from("artists")
+    .update({
+      coach_id: ic.coach_id,
+      tier: ic.tier,
+      status: "active",
+      subscription_status: ic.billing_bypass ? "comp" : "standard",
+    })
+    .eq("id", artist.id);
+  await admin
+    .from("invite_codes")
+    .update({ used_by: uid, used_at: new Date().toISOString() })
+    .eq("id", ic.id);
   return { ok: true };
 }

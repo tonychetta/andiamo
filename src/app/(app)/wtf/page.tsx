@@ -16,11 +16,29 @@ export default async function WtfPage() {
     .order("generated_at", { ascending: false })
     .limit(12);
 
+  // Coach vs artist viewer, and the artist's tier (DIY vs DWY split).
+  const { data: claims } = await supabase.auth.getClaims();
+  const { data: profile } = claims?.claims?.sub
+    ? await supabase
+        .from("profiles")
+        .select("account_type")
+        .eq("id", claims.claims.sub)
+        .maybeSingle()
+    : { data: null };
+  const isCoach = profile?.account_type === "coach";
+  const { data: aid } = await supabase.rpc("current_artist_id");
+  const { data: artistRow } = aid
+    ? await supabase.from("artists").select("tier").eq("id", aid).maybeSingle()
+    : { data: null };
+  const tier = artistRow?.tier ?? "diy";
+
   return (
     <WTFView
       label={weekLabel(start, end)}
       compiled={compiled}
       history={history ?? []}
+      isCoach={isCoach}
+      tier={tier}
     />
   );
 }

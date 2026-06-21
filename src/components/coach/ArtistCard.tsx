@@ -26,11 +26,13 @@ export function ArtistCard({
   name,
   tier,
   status,
+  pictureUrl,
 }: {
   id: string;
   name: string;
   tier: string;
   status: Status;
+  pictureUrl?: string | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -38,11 +40,25 @@ export function ArtistCard({
   return (
     <div className="rounded-2xl bg-surface-secondary p-5 ring-1 ring-ink/5">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="font-serif text-xl text-ink">{name}</p>
-          <span className="mt-1 inline-block rounded-full bg-accent-gold/25 px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wide text-ink">
-            {TIER_LABEL[tier] ?? tier}
-          </span>
+        <div className="flex items-center gap-3">
+          {pictureUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={pictureUrl}
+              alt=""
+              className="h-11 w-11 shrink-0 rounded-full object-cover"
+            />
+          ) : (
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-surface-accent font-serif text-lg text-ink">
+              {name.trim()[0]?.toUpperCase() || "A"}
+            </span>
+          )}
+          <div>
+            <p className="font-serif text-xl text-ink">{name}</p>
+            <span className="mt-1 inline-block rounded-full bg-accent-gold/25 px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wide text-ink">
+              {TIER_LABEL[tier] ?? tier}
+            </span>
+          </div>
         </div>
         <form action={setActiveArtist.bind(null, id)}>
           <button

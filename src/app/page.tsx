@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Logo } from "@/components/Logo";
 import { ArtistCard } from "@/components/coach/ArtistCard";
 import { AssignArtist } from "@/components/coach/AssignArtist";
+import { InviteCodes } from "@/components/coach/InviteCodes";
 import { signOut } from "./actions";
 
 export default async function Home() {
@@ -25,8 +26,13 @@ export default async function Home() {
   // Roster: RLS returns only the artists assigned to this coach.
   const { data: roster } = await supabase
     .from("artists")
-    .select("id, artist_name, tier, status")
+    .select("id, artist_name, tier, status, profiles(profile_picture_url)")
     .order("artist_name", { ascending: true });
+
+  const { data: codes } = await supabase
+    .from("invite_codes")
+    .select("id, code, tier, billing_bypass, used_by, used_at, expires_at")
+    .order("created_at", { ascending: false });
 
   const name = profile?.name?.trim() || "there";
   const initial = (profile?.name?.trim()?.[0] || "A").toUpperCase();
@@ -68,8 +74,8 @@ export default async function Home() {
         </section>
 
         <section className="mt-10">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="font-serif text-2xl text-ink">Your roster</h2>
+          <h2 className="font-serif text-2xl text-ink">Your roster</h2>
+          <div className="mt-4">
             <AssignArtist />
           </div>
 
@@ -82,6 +88,10 @@ export default async function Home() {
                   name={a.artist_name || "Unnamed artist"}
                   tier={a.tier}
                   status={a.status}
+                  pictureUrl={
+                    (a.profiles as { profile_picture_url: string | null } | null)
+                      ?.profile_picture_url ?? null
+                  }
                 />
               ))}
             </div>
@@ -89,10 +99,15 @@ export default async function Home() {
             <div className="mt-5 rounded-2xl border border-dashed border-line p-8 text-center">
               <p className="text-ink">No artists yet.</p>
               <p className="mt-1 text-sm text-ink-soft">
-                Use “Add an artist” to link one by their account email.
+                Use “Add an artist” to link one by their account email, or send
+                them an invite code.
               </p>
             </div>
           )}
+        </section>
+
+        <section className="mt-10">
+          <InviteCodes codes={codes ?? []} />
         </section>
       </main>
     </div>

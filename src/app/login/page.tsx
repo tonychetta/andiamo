@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Eye, EyeSlash } from "@phosphor-icons/react";
 import { Logo } from "@/components/Logo";
 import { createClient } from "@/lib/supabase/client";
+import { redeemInviteCode } from "@/app/coach/actions";
 
 type Mode = "signin" | "signup";
 type Role = "artist" | "coach";
@@ -18,9 +19,23 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [role, setRole] = useState<Role>("artist");
+  const [inviteCode, setInviteCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+
+  async function applyCodeAndGo() {
+    if (inviteCode.trim()) {
+      const r = await redeemInviteCode(inviteCode);
+      if (!r.ok) {
+        setError(r.error ?? "Couldn't apply invite code.");
+        setLoading(false);
+        return;
+      }
+    }
+    router.push("/");
+    router.refresh();
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -38,8 +53,7 @@ export default function LoginPage() {
         setLoading(false);
         return;
       }
-      router.push("/");
-      router.refresh();
+      await applyCodeAndGo();
       return;
     }
 
@@ -55,12 +69,15 @@ export default function LoginPage() {
       return;
     }
     if (data.session) {
-      router.push("/");
-      router.refresh();
+      await applyCodeAndGo();
       return;
     }
     // Email confirmation is on — no session yet.
-    setInfo("Account created. Check your email to confirm, then sign in.");
+    setInfo(
+      inviteCode.trim()
+        ? "Account created. Confirm your email, then sign in here with your code to apply it."
+        : "Account created. Check your email to confirm, then sign in.",
+    );
     setMode("signin");
     setLoading(false);
   }
@@ -129,6 +146,16 @@ export default function LoginPage() {
                 ))}
               </div>
             </div>
+          )}
+
+          {(!isSignup || role === "artist") && (
+            <Field
+              label="Invite code (optional)"
+              value={inviteCode}
+              onChange={setInviteCode}
+              type="text"
+              autoComplete="off"
+            />
           )}
 
           {error && <p className="text-sm text-red-700">{error}</p>}

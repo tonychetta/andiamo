@@ -24,10 +24,12 @@ export function VisionView({
   vision,
   goals,
   transcript,
+  canEdit = true,
 }: {
   vision: Vision;
   goals: Goal[];
   transcript: Turn[];
+  canEdit?: boolean;
 }) {
   const [mode, setMode] = useState<"vision" | "builder">("vision");
 
@@ -45,29 +47,37 @@ export function VisionView({
 
   return (
     <div>
-      {/* Always-visible toggle to flip into the conversation */}
-      <button
-        onClick={() => setMode("builder")}
-        className="fixed left-4 top-4 z-50 inline-flex items-center gap-1.5 rounded-full bg-surface-secondary px-3 py-2 text-sm text-ink shadow-sm transition-colors hover:bg-surface-accent"
-      >
-        <ChatCircle size={16} />
-        Refine
-      </button>
+      {/* Refine reopens the Builder — artist only (a coach can't edit the Vision) */}
+      {canEdit && (
+        <button
+          onClick={() => setMode("builder")}
+          className="fixed left-4 top-4 z-50 inline-flex items-center gap-1.5 rounded-full bg-surface-secondary px-3 py-2 text-sm text-ink shadow-sm transition-colors hover:bg-surface-accent"
+        >
+          <ChatCircle size={16} />
+          Refine
+        </button>
+      )}
 
       <p className="text-sm uppercase tracking-[0.2em] text-ink-soft">
         Your Vision
       </p>
 
-      {/* Vision Statement */}
-      <EditableBlock
-        value={vision.statement_text}
-        onSave={(text) => updateVisionStatement(vision.id, text)}
-        render={(text) => (
-          <p className="mt-4 font-serif text-2xl leading-snug text-ink">
-            {text}
-          </p>
-        )}
-      />
+      {/* Vision Statement — editable by the artist, read-only for a coach */}
+      {canEdit ? (
+        <EditableBlock
+          value={vision.statement_text}
+          onSave={(text) => updateVisionStatement(vision.id, text)}
+          render={(text) => (
+            <p className="mt-4 font-serif text-2xl leading-snug text-ink">
+              {text}
+            </p>
+          )}
+        />
+      ) : (
+        <p className="mt-4 font-serif text-2xl leading-snug text-ink">
+          {vision.statement_text}
+        </p>
+      )}
 
       {/* 3 Goals */}
       <h2 className="mt-12 font-serif text-xl text-ink">Your 3 Goals</h2>

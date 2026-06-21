@@ -15,6 +15,8 @@ import {
   setTaskStatus,
   setTaskOnWtf,
   setTaskPriority,
+  setTaskAssignee,
+  setTaskPushReason,
 } from "@/app/(app)/roadmap/actions";
 import { toggleReleaseTask } from "@/app/(app)/releases/actions";
 import { generateWtf, deleteWtf } from "@/app/(app)/wtf/actions";
@@ -25,7 +27,18 @@ type Milestone = {
   status: string;
   priority: boolean;
   goalLabel: string;
+  assignee: string;
+  pushReason: string | null;
 };
+
+const PUSH_REASONS = [
+  "Task wasn't broken down enough",
+  "Capacity was overestimated",
+  "Wasn't sure how to do it",
+  "Blocked by external dependency",
+  "Lost focus / motivation",
+  "Other",
+];
 type Release = {
   id: string;
   description: string;
@@ -81,10 +94,14 @@ export function WTFView({
   label,
   compiled,
   history,
+  isCoach = false,
+  tier = "diy",
 }: {
   label: string;
   compiled: Compiled;
   history: HistoryRow[];
+  isCoach?: boolean;
+  tier?: string;
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -141,13 +158,53 @@ export function WTFView({
         </div>
       ) : (
         <div className="mt-6 space-y-6">
-          {milestones.length > 0 && (
-            <Section title="Milestone Tasks">
-              {milestones.map((m) => (
-                <MilestoneRow key={m.id} m={m} onRun={run} />
-              ))}
-            </Section>
-          )}
+          {milestones.length > 0 &&
+            (tier === "dwy" ? (
+              <>
+                {milestones.filter((m) => m.assignee !== "coach").length > 0 && (
+                  <Section title="Milestone Tasks · Artist">
+                    {milestones
+                      .filter((m) => m.assignee !== "coach")
+                      .map((m) => (
+                        <MilestoneRow
+                          key={m.id}
+                          m={m}
+                          onRun={run}
+                          showAssign
+                          isCoach={isCoach}
+                        />
+                      ))}
+                  </Section>
+                )}
+                {milestones.filter((m) => m.assignee === "coach").length > 0 && (
+                  <Section title="Milestone Tasks · Coach">
+                    {milestones
+                      .filter((m) => m.assignee === "coach")
+                      .map((m) => (
+                        <MilestoneRow
+                          key={m.id}
+                          m={m}
+                          onRun={run}
+                          showAssign
+                          isCoach={isCoach}
+                        />
+                      ))}
+                  </Section>
+                )}
+              </>
+            ) : (
+              <Section title="Milestone Tasks">
+                {milestones.map((m) => (
+                  <MilestoneRow
+                    key={m.id}
+                    m={m}
+                    onRun={run}
+                    showAssign={false}
+                    isCoach={isCoach}
+                  />
+                ))}
+              </Section>
+            ))}
 
           {compiled.releases.length > 0 && (
             <Section title="Release Tasks">
@@ -293,9 +350,13 @@ function Section({
 function MilestoneRow({
   m,
   onRun,
+  showAssign,
+  isCoach,
 }: {
   m: Milestone;
   onRun: (fn: () => Promise<unknown>) => void;
+  showAssign: boolean;
+  isCoach: boolean;
 }) {
   const [menu, setMenu] = useState(false);
   const done = isDone(m.status);
@@ -306,7 +367,8 @@ function MilestoneRow({
   }
 
   return (
-    <div className="relative flex items-start gap-2 border-b border-line py-2 last:border-0">
+    <div className="border-b border-line py-2 last:border-0">
+    <div className="relative flex items-start gap-2">
       <button
         onClick={() => onRun(() => setTaskPriority(m.id))}
         aria-label="Make priority"
@@ -362,12 +424,40 @@ function MilestoneRow({
             <Item onClick={() => act(() => setTaskStatus(m.id, "complete_and_push"))}>
               Complete and Push
             </Item>
+            {showAssign && (
+              <>
+                <div className="my-1 border-t border-line" />
+                <Item onClick={() => act(() => setTaskAssignee(m.id, "artist"))}>
+                  Assign to Artist
+                </Item>
+                <Item onClick={() => act(() => setTaskAssignee(m.id, "coach"))}>
+                  Assign to Coach
+                </Item>
+              </>
+            )}
             <div className="my-1 border-t border-line" />
             <Item onClick={() => act(() => setTaskOnWtf(m.id, false))}>
               Remove from WTF
             </Item>
           </div>
         </>
+      )}
+      </div>
+
+      {/* Coach-only "why was this pushed?" diagnostic (never shown to artist) */}
+      {isCoach && m.status === "pushed" && (
+        <select
+          value={m.pushReason ?? ""}
+          onChange={(e) => onRun(() => setTaskPushReason(m.id, e.target.value))}
+          className="mt-1.5 w-full rounded-lg border border-line bg-surface-primary px-2 py-1 text-xs text-ink-soft outline-none focus:border-ink"
+        >
+          <option value="">Why pushed? (coach note)</option>
+          {PUSH_REASONS.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </select>
       )}
     </div>
   );

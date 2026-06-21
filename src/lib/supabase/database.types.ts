@@ -355,6 +355,50 @@ export type Database = {
           },
         ]
       }
+      invite_codes: {
+        Row: {
+          billing_bypass: boolean
+          coach_id: string
+          code: string
+          created_at: string
+          expires_at: string
+          id: string
+          tier: Database["public"]["Enums"]["artist_tier"]
+          used_at: string | null
+          used_by: string | null
+        }
+        Insert: {
+          billing_bypass?: boolean
+          coach_id: string
+          code: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          tier?: Database["public"]["Enums"]["artist_tier"]
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Update: {
+          billing_bypass?: boolean
+          coach_id?: string
+          code?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          tier?: Database["public"]["Enums"]["artist_tier"]
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invite_codes_coach_id_fkey"
+            columns: ["coach_id"]
+            isOneToOne: false
+            referencedRelation: "coaches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       milestones: {
         Row: {
           artist_id: string
@@ -735,6 +779,7 @@ export type Database = {
           milestone_id: string | null
           on_wtf: boolean
           parent_task_id: string | null
+          push_reason: string | null
           status: Database["public"]["Enums"]["task_status"]
           updated_at: string
           wtf_priority: boolean
@@ -752,6 +797,7 @@ export type Database = {
           milestone_id?: string | null
           on_wtf?: boolean
           parent_task_id?: string | null
+          push_reason?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           updated_at?: string
           wtf_priority?: boolean
@@ -769,6 +815,7 @@ export type Database = {
           milestone_id?: string | null
           on_wtf?: boolean
           parent_task_id?: string | null
+          push_reason?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           updated_at?: string
           wtf_priority?: boolean

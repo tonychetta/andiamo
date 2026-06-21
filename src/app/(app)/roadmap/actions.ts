@@ -254,6 +254,32 @@ export async function setTaskPriority(taskId: string) {
   revalidatePath("/wtf");
 }
 
+// DWY: assign a WTF task to the artist or the coach (Section 14.4).
+export async function setTaskAssignee(
+  taskId: string,
+  assignee: "artist" | "coach" | "both",
+) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("tasks")
+    .update({ assigned_to: assignee })
+    .eq("id", taskId);
+  if (error) throw new Error(error.message);
+  revalidatePath("/wtf");
+  revalidatePath("/roadmap");
+}
+
+// Coach-only diagnostic: note why a task was pushed (Section 14.5).
+export async function setTaskPushReason(taskId: string, reason: string) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("tasks")
+    .update({ push_reason: reason || null })
+    .eq("id", taskId);
+  if (error) throw new Error(error.message);
+  revalidatePath("/wtf");
+}
+
 // Make a task depend on another (parent) task, or clear it (parentId null).
 export async function setTaskDependency(
   taskId: string,
