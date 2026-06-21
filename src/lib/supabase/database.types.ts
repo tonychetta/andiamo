@@ -609,6 +609,54 @@ export type Database = {
           },
         ]
       }
+      results_entries: {
+        Row: {
+          artist_id: string
+          created_at: string
+          entry_date: string
+          id: string
+          metric_key: string
+          song_id: string | null
+          updated_at: string
+          value: number
+        }
+        Insert: {
+          artist_id: string
+          created_at?: string
+          entry_date: string
+          id?: string
+          metric_key: string
+          song_id?: string | null
+          updated_at?: string
+          value?: number
+        }
+        Update: {
+          artist_id?: string
+          created_at?: string
+          entry_date?: string
+          id?: string
+          metric_key?: string
+          song_id?: string | null
+          updated_at?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "results_entries_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "artists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "results_entries_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "songs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       songs: {
         Row: {
           artist_id: string
