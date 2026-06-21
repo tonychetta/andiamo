@@ -283,7 +283,7 @@ export function ContentView({
           into the page / a lightbox behind it. */}
       <div
         ref={scrollRef}
-        className="mt-1 flex-1 space-y-1 overflow-y-auto overscroll-contain pb-6"
+        className="mt-1 flex-1 select-none space-y-1 overflow-y-auto overscroll-contain pb-6"
       >
         {view === "monthly"
           ? weeks.map((week, wi) => {
@@ -593,7 +593,7 @@ function ContentPill({
           onOpen();
         }}
         className={className}
-        style={{ ...style, touchAction: "none" }}
+        style={{ ...style, touchAction: "none", WebkitTouchCallout: "none" }}
       >
         {children}
       </span>

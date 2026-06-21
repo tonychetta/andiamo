@@ -37,6 +37,7 @@ type Content = {
   id: string;
   date: string;
   typeName: string;
+  typeColor: string;
   songTitle: string;
   sections: string[];
 };
@@ -202,7 +203,8 @@ export function WTFView({
                         {items.map((c) => (
                           <div
                             key={c.id}
-                            className="rounded bg-surface-primary px-1 py-0.5 text-[9px] leading-tight text-ink"
+                            className="rounded px-1 py-0.5 text-[9px] leading-tight text-ink"
+                            style={{ backgroundColor: `${c.typeColor}40` }}
                           >
                             {c.typeName}
                             <span className="block text-ink-soft">

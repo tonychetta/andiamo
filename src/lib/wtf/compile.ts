@@ -23,6 +23,7 @@ export type CompiledWtf = {
     id: string;
     date: string;
     typeName: string;
+    typeColor: string;
     songTitle: string;
     sections: string[];
   }[];
@@ -79,7 +80,7 @@ export async function compileWtf(
     supabase
       .from("content_pieces")
       .select(
-        "id, scheduled_date, song_sections, songs(title), content_piece_types(content_type_tags(name))",
+        "id, scheduled_date, song_sections, songs(title), content_piece_types(content_type_tags(name, color))",
       )
       .gte("scheduled_date", weekStart)
       .lte("scheduled_date", weekEnd)
@@ -113,13 +114,15 @@ export async function compileWtf(
   const content = (cp ?? []).map((c) => {
     const song = c.songs as { title?: string } | null;
     const types = c.content_piece_types as
-      | { content_type_tags?: { name?: string } | null }[]
+      | { content_type_tags?: { name?: string; color?: string } | null }[]
       | null;
+    const tag = types?.[0]?.content_type_tags;
     return {
       id: c.id,
       date: c.scheduled_date,
       songTitle: song?.title ?? "",
-      typeName: types?.[0]?.content_type_tags?.name ?? "Content",
+      typeName: tag?.name ?? "Content",
+      typeColor: tag?.color ?? "#9b8d7a",
       sections: (c.song_sections as string[]) ?? [],
     };
   });
@@ -179,7 +182,7 @@ export function buildWtfHtml(w: CompiledWtf, artistName: string): string {
         .filter((c) => c.date === d)
         .map(
           (c) =>
-            `<div style="background:#efe9dd;border-radius:6px;padding:3px 4px;margin-bottom:3px;font-size:9px;color:${ink};line-height:1.3;">${c.typeName}<br><span style="color:${soft};">${c.songTitle}${
+            `<div style="background:${c.typeColor}40;border-radius:6px;padding:3px 4px;margin-bottom:3px;font-size:9px;color:${ink};line-height:1.3;">${c.typeName}<br><span style="color:${soft};">${c.songTitle}${
               c.sections.length ? ` · ${c.sections.join(", ")}` : ""
             }</span></div>`,
         )
