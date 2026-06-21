@@ -1,6 +1,5 @@
 // Minimal Resend client over REST (no SDK dependency). Server-only.
-// Set WTF_EMAIL_FROM to a verified-domain sender for production; the default
-// onboarding@resend.dev only delivers to your own Resend account email.
+// Sends from the verified andiamodev.com domain (override with WTF_EMAIL_FROM).
 
 export async function sendEmail(opts: {
   to: string;
@@ -9,7 +8,7 @@ export async function sendEmail(opts: {
 }): Promise<{ ok: boolean; error?: string }> {
   const key = process.env.RESEND_API_KEY;
   if (!key || !opts.to) return { ok: false, error: "missing key or recipient" };
-  const from = process.env.WTF_EMAIL_FROM || "Andiamo <onboarding@resend.dev>";
+  const from = process.env.WTF_EMAIL_FROM || "Andiamo <hello@andiamodev.com>";
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
