@@ -24,8 +24,7 @@ type Milestone = {
   description: string;
   status: string;
   priority: boolean;
-  goalTitle: string;
-  milestoneTitle: string;
+  goalLabel: string;
 };
 type Release = {
   id: string;
@@ -34,7 +33,22 @@ type Release = {
   dueDate: string | null;
   releaseTitle: string;
 };
-type Content = { id: string; date: string; typeName: string; songTitle: string };
+type Content = {
+  id: string;
+  date: string;
+  typeName: string;
+  songTitle: string;
+  sections: string[];
+};
+
+const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+function weekDates(start: string): string[] {
+  const [y, m, d] = start.split("-").map(Number);
+  const base = Date.UTC(y, m - 1, d);
+  return Array.from({ length: 7 }, (_, i) =>
+    new Date(base + i * 86_400_000).toISOString().slice(0, 10),
+  );
+}
 type Compiled = {
   weekStart: string;
   weekEnd: string;
@@ -166,21 +180,45 @@ export function WTFView({
           )}
 
           {compiled.content.length > 0 && (
-            <Section title="Content">
-              {compiled.content.map((c) => (
-                <div key={c.id} className="flex items-start gap-2.5 py-1.5">
-                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-ink/30" />
-                  <span>
-                    <span className="text-sm text-ink">
-                      {c.typeName} — {c.songTitle || "song"}
-                    </span>
-                    <span className="block text-xs text-ink-soft">
-                      {fmtDay(c.date)}
-                    </span>
-                  </span>
-                </div>
-              ))}
-            </Section>
+            <div>
+              <h2 className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-ink-soft">
+                Content
+              </h2>
+              <div className="grid grid-cols-7 gap-1">
+                {weekDates(compiled.weekStart).map((d) => {
+                  const [yy, mm, dd] = d.split("-").map(Number);
+                  const dow = new Date(Date.UTC(yy, mm - 1, dd)).getUTCDay();
+                  const items = compiled.content.filter((c) => c.date === d);
+                  return (
+                    <div
+                      key={d}
+                      className="min-h-[72px] rounded-lg bg-surface-secondary p-1"
+                    >
+                      <div className="text-[9px] uppercase text-ink-soft">
+                        {WD[dow]}
+                      </div>
+                      <div className="text-[11px] text-ink">{dd}</div>
+                      <div className="mt-0.5 space-y-0.5">
+                        {items.map((c) => (
+                          <div
+                            key={c.id}
+                            className="rounded bg-surface-primary px-1 py-0.5 text-[9px] leading-tight text-ink"
+                          >
+                            {c.typeName}
+                            <span className="block text-ink-soft">
+                              {c.songTitle}
+                              {c.sections.length
+                                ? ` · ${c.sections.join(", ")}`
+                                : ""}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           )}
         </div>
       )}
@@ -296,8 +334,8 @@ function MilestoneRow({
         {m.status === "complete_and_push" && (
           <ArrowsClockwise size={13} className="ml-1.5 inline align-middle text-ink-soft" />
         )}
-        {m.goalTitle && (
-          <span className="block text-xs text-ink-soft">{m.goalTitle}</span>
+        {m.goalLabel && (
+          <span className="block text-xs text-ink-soft">{m.goalLabel}</span>
         )}
       </span>
 

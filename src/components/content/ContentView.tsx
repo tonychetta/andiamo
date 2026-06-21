@@ -8,6 +8,7 @@ import {
   addSong,
   saveContentPiece,
   deleteContentPiece,
+  moveContentPiece,
   type LinkInput,
 } from "@/app/(app)/content/actions";
 import { PerformanceDashboard } from "./PerformanceDashboard";
@@ -119,12 +120,17 @@ export function ContentView({
   contentTypes: ContentType[];
   pieces: Piece[];
 }) {
+  const router = useRouter();
   const [editing, setEditing] = useState<{ piece?: Piece; date: string } | null>(
     null,
   );
   const [view, setView] = useState<"monthly" | "weekly">("weekly");
   const [mode, setMode] = useState<"calendar" | "dashboard">("calendar");
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  function moveTo(id: string, date: string) {
+    moveContentPiece(id, date).then(() => router.refresh());
+  }
 
   const typeById = useMemo(
     () => new Map(typesProp.map((t) => [t.id, t])),
@@ -298,6 +304,7 @@ export function ContentView({
                         <button
                           key={d.date}
                           id={`day-${d.date}`}
+                          data-date={d.date}
                           onClick={() => setEditing({ date: d.date })}
                           className={`flex min-h-[96px] flex-col rounded-lg border p-1 text-left transition-colors ${
                             releaseTitle
@@ -327,15 +334,16 @@ export function ContentView({
                               const color = t?.color ?? "#9b8";
                               const posted = p.links.length > 0;
                               return (
-                                <span
+                                <ContentPill
                                   key={p.id}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
+                                  piece={p}
+                                  onOpen={() =>
                                     setEditing({
                                       piece: p,
                                       date: p.scheduled_date,
-                                    });
-                                  }}
+                                    })
+                                  }
+                                  onMove={moveTo}
                                   className="block line-clamp-2 rounded px-1 py-0.5 text-[10px] leading-tight text-ink"
                                   style={{
                                     backgroundColor: posted
@@ -347,7 +355,7 @@ export function ContentView({
                                   }}
                                 >
                                   {t?.name ?? p.song_title ?? "Content"}
-                                </span>
+                                </ContentPill>
                               );
                             })}
                             {dayPieces.length > 3 && (
@@ -377,6 +385,7 @@ export function ContentView({
                       <button
                         key={d.date}
                         id={`day-${d.date}`}
+                        data-date={d.date}
                         onClick={() => setEditing({ date: d.date })}
                         className={`flex w-full gap-3 rounded-lg border p-2 text-left transition-colors ${
                           releaseTitle
@@ -413,15 +422,16 @@ export function ContentView({
                                 const color = t?.color ?? "#9b8";
                                 const posted = p.links.length > 0;
                                 return (
-                                  <span
+                                  <ContentPill
                                     key={p.id}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
+                                    piece={p}
+                                    onOpen={() =>
                                       setEditing({
                                         piece: p,
                                         date: p.scheduled_date,
-                                      });
-                                    }}
+                                      })
+                                    }
+                                    onMove={moveTo}
                                     className="rounded-md px-2 py-1 text-sm text-ink"
                                     style={{
                                       backgroundColor: posted
@@ -433,7 +443,7 @@ export function ContentView({
                                     }}
                                   >
                                     {t?.name ?? p.song_title ?? "Content"}
-                                  </span>
+                                  </ContentPill>
                                 );
                               })}
                             </div>
@@ -485,6 +495,123 @@ export function ContentView({
         />
       )}
     </section>
+  );
+}
+
+// A content pill that opens its lightbox on tap, and on press-and-hold lifts a
+// floating clone you can drag onto another day (drop detected via [data-date]).
+// A fixed-position ghost avoids the calendar's overflow clipping.
+function ContentPill({
+  piece,
+  onOpen,
+  onMove,
+  className,
+  style,
+  children,
+}: {
+  piece: { id: string; scheduled_date: string };
+  onOpen: () => void;
+  onMove: (id: string, date: string) => void;
+  className?: string;
+  style?: React.CSSProperties;
+  children: React.ReactNode;
+}) {
+  const [ghost, setGhost] = useState<{ x: number; y: number } | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startPt = useRef<{ x: number; y: number } | null>(null);
+  const dragging = useRef(false);
+  const suppressClick = useRef(false);
+
+  function clearTimer() {
+    if (timer.current) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
+  }
+  const onMoveDoc = (ev: PointerEvent) => {
+    if (dragging.current) setGhost({ x: ev.clientX, y: ev.clientY });
+  };
+  const onUpDoc = (ev: PointerEvent) => {
+    document.removeEventListener("pointermove", onMoveDoc);
+    const was = dragging.current;
+    dragging.current = false;
+    setGhost(null);
+    if (was) {
+      suppressClick.current = true;
+      const el = document.elementFromPoint(
+        ev.clientX,
+        ev.clientY,
+      ) as HTMLElement | null;
+      let n: HTMLElement | null = el;
+      while (n && !n.dataset.date) n = n.parentElement;
+      const date = n?.dataset.date;
+      if (date && date !== piece.scheduled_date) onMove(piece.id, date);
+    }
+  };
+  useEffect(() => {
+    return () => {
+      document.removeEventListener("pointermove", onMoveDoc);
+      document.removeEventListener("pointerup", onUpDoc);
+      clearTimer();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function down(e: React.PointerEvent) {
+    startPt.current = { x: e.clientX, y: e.clientY };
+    clearTimer();
+    timer.current = setTimeout(() => {
+      dragging.current = true;
+      setGhost({ x: startPt.current!.x, y: startPt.current!.y });
+      document.addEventListener("pointermove", onMoveDoc);
+      document.addEventListener("pointerup", onUpDoc, { once: true });
+    }, 300);
+  }
+  function moveEl(e: React.PointerEvent) {
+    if (
+      startPt.current &&
+      (Math.abs(e.clientX - startPt.current.x) > 8 ||
+        Math.abs(e.clientY - startPt.current.y) > 8)
+    )
+      clearTimer();
+  }
+
+  return (
+    <>
+      <span
+        onPointerDown={down}
+        onPointerMove={moveEl}
+        onPointerUp={clearTimer}
+        onPointerLeave={clearTimer}
+        onPointerCancel={clearTimer}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (suppressClick.current) {
+            suppressClick.current = false;
+            return;
+          }
+          onOpen();
+        }}
+        className={className}
+        style={{ ...style, touchAction: "none" }}
+      >
+        {children}
+      </span>
+      {ghost && (
+        <span
+          className={`pointer-events-none fixed z-[90] ${className ?? ""}`}
+          style={{
+            ...style,
+            left: ghost.x,
+            top: ghost.y,
+            transform: "translate(-50%,-50%) scale(1.05)",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
+          }}
+        >
+          {children}
+        </span>
+      )}
+    </>
   );
 }
 

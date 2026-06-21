@@ -10,8 +10,7 @@ export type CompiledWtf = {
     description: string;
     status: string;
     priority: boolean;
-    goalTitle: string;
-    milestoneTitle: string;
+    goalLabel: string;
   }[];
   releases: {
     id: string;
@@ -25,19 +24,36 @@ export type CompiledWtf = {
     date: string;
     typeName: string;
     songTitle: string;
+    sections: string[];
   }[];
 };
 
-// Monday→Sunday bounds for the week containing `today` (YYYY-MM-DD).
+// Sunday→Saturday bounds for the week containing `today` (YYYY-MM-DD).
 export function weekBounds(today: string): { start: string; end: string } {
   const [y, m, d] = today.split("-").map(Number);
   const base = Date.UTC(y, m - 1, d);
   const dow = new Date(base).getUTCDay(); // 0 Sun … 6 Sat
-  const offset = (dow + 6) % 7; // days since Monday
-  const startMs = base - offset * 86_400_000;
+  const startMs = base - dow * 86_400_000; // back to Sunday
   const fmt = (ms: number) => new Date(ms).toISOString().slice(0, 10);
   return { start: fmt(startMs), end: fmt(startMs + 6 * 86_400_000) };
 }
+
+// The 7 day-dates Sun→Sat for a week starting at `start`.
+export function weekDays(start: string): string[] {
+  const [y, m, d] = start.split("-").map(Number);
+  const base = Date.UTC(y, m - 1, d);
+  return Array.from({ length: 7 }, (_, i) =>
+    new Date(base + i * 86_400_000).toISOString().slice(0, 10),
+  );
+}
+
+const GOAL_LABEL: Record<string, string> = {
+  audience_size: "Audience",
+  revenue_generating: "Revenue",
+  team: "Team",
+  catalog: "Catalog",
+  recognition_awards: "Recognition",
+};
 
 // Compile the current week's WTF: swiped Milestone Tasks + Release Tasks and
 // Content scheduled within the week. RLS scopes everything to the artist.
@@ -50,7 +66,7 @@ export async function compileWtf(
     supabase
       .from("tasks")
       .select(
-        "id, description, status, wtf_priority, display_order, milestones(description, goals(description))",
+        "id, description, status, wtf_priority, display_order, milestones(goals(category))",
       )
       .eq("on_wtf", true)
       .order("display_order", { ascending: true }),
@@ -63,7 +79,7 @@ export async function compileWtf(
     supabase
       .from("content_pieces")
       .select(
-        "id, scheduled_date, songs(title), content_piece_types(content_type_tags(name))",
+        "id, scheduled_date, song_sections, songs(title), content_piece_types(content_type_tags(name))",
       )
       .gte("scheduled_date", weekStart)
       .lte("scheduled_date", weekEnd)
@@ -72,16 +88,14 @@ export async function compileWtf(
 
   const milestones = (mt ?? []).map((t) => {
     const ms = t.milestones as {
-      description?: string;
-      goals?: { description?: string } | null;
+      goals?: { category?: string } | null;
     } | null;
     return {
       id: t.id,
       description: t.description,
       status: t.status as string,
       priority: t.wtf_priority,
-      goalTitle: ms?.goals?.description ?? "",
-      milestoneTitle: ms?.description ?? "",
+      goalLabel: GOAL_LABEL[ms?.goals?.category ?? ""] ?? "",
     };
   });
 
@@ -106,6 +120,7 @@ export async function compileWtf(
       date: c.scheduled_date,
       songTitle: song?.title ?? "",
       typeName: types?.[0]?.content_type_tags?.name ?? "Content",
+      sections: (c.song_sections as string[]) ?? [],
     };
   });
 
@@ -148,14 +163,38 @@ export function buildWtfHtml(w: CompiledWtf, artistName: string): string {
       : "";
 
   const milestoneRows =
-    (priority ? li(priority.description, priority.goalTitle, true) : "") +
-    rest.map((m) => li(m.description, m.goalTitle)).join("");
+    (priority ? li(priority.description, priority.goalLabel, true) : "") +
+    rest.map((m) => li(m.description, m.goalLabel)).join("");
   const releaseRows = w.releases
     .map((r) => li(r.description, r.releaseTitle))
     .join("");
-  const contentRows = w.content
-    .map((c) => li(`${c.typeName} — ${c.songTitle}`, fmtDay(c.date)))
+
+  // Content as a Sun–Sat week calendar with pills in each day.
+  const wd = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const dayCells = weekDays(w.weekStart)
+    .map((d) => {
+      const [yy, mm, dd] = d.split("-").map(Number);
+      const dow = new Date(Date.UTC(yy, mm - 1, dd)).getUTCDay();
+      const pills = w.content
+        .filter((c) => c.date === d)
+        .map(
+          (c) =>
+            `<div style="background:#efe9dd;border-radius:6px;padding:3px 4px;margin-bottom:3px;font-size:9px;color:${ink};line-height:1.3;">${c.typeName}<br><span style="color:${soft};">${c.songTitle}${
+              c.sections.length ? ` · ${c.sections.join(", ")}` : ""
+            }</span></div>`,
+        )
+        .join("");
+      return `<td valign="top" style="width:14.2%;padding:3px;border:1px solid #e7e0d5;">
+        <div style="font-size:9px;color:${soft};text-transform:uppercase;">${wd[dow]}</div>
+        <div style="font-size:12px;color:${ink};margin-bottom:3px;">${dd}</div>
+        ${pills}
+      </td>`;
+    })
     .join("");
+  const contentCalendar = w.content.length
+    ? `<tr><td style="padding:18px 0 6px;"><div style="color:${soft};font-size:11px;letter-spacing:2px;text-transform:uppercase;">Content</div></td></tr>
+       <tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="table-layout:fixed;"><tr>${dayCells}</tr></table></td></tr>`
+    : "";
 
   return `<!doctype html><html><body style="margin:0;background:${cream};font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${cream};padding:28px 0;">
@@ -168,9 +207,9 @@ export function buildWtfHtml(w: CompiledWtf, artistName: string): string {
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
             ${section("Milestone Tasks", milestoneRows)}
             ${section("Release Tasks", releaseRows)}
-            ${section("Content", contentRows)}
+            ${contentCalendar}
             ${
-              !milestoneRows && !releaseRows && !contentRows
+              !milestoneRows && !releaseRows && !w.content.length
                 ? `<tr><td style="padding:18px 0;color:${soft};font-size:14px;">No tasks on the WTF this week.</td></tr>`
                 : ""
             }
@@ -181,14 +220,4 @@ export function buildWtfHtml(w: CompiledWtf, artistName: string): string {
     </td></tr>
   </table>
   </body></html>`;
-}
-
-function fmtDay(s: string): string {
-  const [y, m, d] = s.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
 }
