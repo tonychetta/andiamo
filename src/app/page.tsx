@@ -16,7 +16,7 @@ export default async function Home() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("name, account_type")
+    .select("name, account_type, profile_picture_url")
     .eq("id", userId)
     .single();
 
@@ -56,9 +56,18 @@ export default async function Home() {
           </form>
           <div
             aria-label="Profile"
-            className="grid h-11 w-11 place-items-center rounded-full bg-surface-accent font-serif text-lg text-ink"
+            className="grid h-11 w-11 place-items-center overflow-hidden rounded-full bg-surface-accent font-serif text-lg text-ink"
           >
-            {initial}
+            {profile?.profile_picture_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={profile.profile_picture_url}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              initial
+            )}
           </div>
         </div>
       </header>

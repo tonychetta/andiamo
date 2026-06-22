@@ -4,6 +4,7 @@ import { ArrowLeft, SignOut } from "@phosphor-icons/react/dist/ssr";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/app/actions";
 import { EnableNotifications } from "@/components/EnableNotifications";
+import { ProfilePicture } from "@/components/ProfilePicture";
 
 export default async function ProfilePage() {
   const supabase = await createClient();
@@ -14,12 +15,13 @@ export default async function ProfilePage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("name, email, account_type")
+    .select("name, email, account_type, profile_picture_url")
     .eq("id", userId)
     .single();
 
   const name = profile?.name?.trim() || "—";
   const role = profile?.account_type ?? "artist";
+  const initial = (profile?.name?.trim()?.[0] || "A").toUpperCase();
 
   return (
     <div className="mx-auto min-h-dvh w-full max-w-md px-5 py-6">
@@ -32,6 +34,13 @@ export default async function ProfilePage() {
       </Link>
 
       <h1 className="mt-6 font-serif text-4xl text-ink">Profile</h1>
+
+      <div className="mt-8">
+        <ProfilePicture
+          currentUrl={profile?.profile_picture_url ?? null}
+          initial={initial}
+        />
+      </div>
 
       <dl className="mt-8 divide-y divide-line rounded-2xl bg-surface-secondary px-5">
         <Row label="Name" value={name} />

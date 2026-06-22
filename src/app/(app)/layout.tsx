@@ -23,7 +23,7 @@ export default async function AppLayout({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("name, account_type")
+    .select("name, account_type, profile_picture_url")
     .eq("id", userId)
     .single();
 
@@ -44,6 +44,7 @@ export default async function AppLayout({
   }
 
   const initial = (profile?.name?.trim()?.[0] || "A").toUpperCase();
+  const pictureUrl = profile?.profile_picture_url ?? null;
 
   return (
     <div className="min-h-dvh">
@@ -51,14 +52,19 @@ export default async function AppLayout({
       <Link
         href="/profile"
         aria-label="Profile and settings"
-        className="fixed right-4 top-4 z-50 grid h-11 w-11 place-items-center rounded-full bg-surface-accent font-serif text-base text-ink transition-opacity hover:opacity-80"
+        className="fixed right-4 top-4 z-50 grid h-11 w-11 place-items-center overflow-hidden rounded-full bg-surface-accent font-serif text-base text-ink transition-opacity hover:opacity-80"
         style={{
           WebkitMaskImage:
             "radial-gradient(circle, #000 66%, rgba(0,0,0,0) 100%)",
           maskImage: "radial-gradient(circle, #000 66%, rgba(0,0,0,0) 100%)",
         }}
       >
-        {initial}
+        {pictureUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={pictureUrl} alt="" className="h-full w-full object-cover" />
+        ) : (
+          initial
+        )}
       </Link>
 
       <main className="mx-auto w-full max-w-md px-5 pb-28 pt-16">
