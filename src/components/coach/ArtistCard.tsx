@@ -1,11 +1,17 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CaretRight } from "@phosphor-icons/react";
-import { setActiveArtist, setArtistStatus } from "@/app/coach/actions";
+import {
+  setActiveArtist,
+  setArtistStatus,
+  setArtistTier,
+  removeArtistFromRoster,
+} from "@/app/coach/actions";
 
 type Status = "awaiting_match" | "active" | "graduated" | "paused" | "departed";
+type Tier = "free" | "self_serve" | "diy" | "dwy";
 
 const TIER_LABEL: Record<string, string> = {
   free: "Free",
@@ -13,6 +19,12 @@ const TIER_LABEL: Record<string, string> = {
   diy: "DIY",
   dwy: "DWY",
 };
+const TIER_OPTIONS: { value: Tier; label: string }[] = [
+  { value: "diy", label: "DIY" },
+  { value: "dwy", label: "DWY" },
+  { value: "self_serve", label: "Self-serve" },
+  { value: "free", label: "Free" },
+];
 const STATUS_OPTIONS: { value: Status; label: string }[] = [
   { value: "active", label: "Active" },
   { value: "paused", label: "Paused" },
@@ -36,6 +48,7 @@ export function ArtistCard({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [confirmRemove, setConfirmRemove] = useState(false);
 
   return (
     <div className="rounded-2xl bg-surface-secondary p-5 ring-1 ring-ink/5">
@@ -70,28 +83,88 @@ export function ArtistCard({
         </form>
       </div>
 
-      <label className="mt-4 block">
-        <span className="text-[10px] uppercase tracking-wide text-ink-soft">
-          Status
-        </span>
-        <select
-          value={status}
-          disabled={pending}
-          onChange={(e) =>
-            startTransition(async () => {
-              await setArtistStatus(id, e.target.value as Status);
-              router.refresh();
-            })
-          }
-          className="mt-1 w-full rounded-lg border border-line bg-surface-primary px-3 py-2 text-sm text-ink outline-none focus:border-ink"
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <label className="block">
+          <span className="text-[10px] uppercase tracking-wide text-ink-soft">
+            Tier
+          </span>
+          <select
+            value={tier}
+            disabled={pending}
+            onChange={(e) =>
+              startTransition(async () => {
+                await setArtistTier(id, e.target.value as Tier);
+                router.refresh();
+              })
+            }
+            className="mt-1 w-full rounded-lg border border-line bg-surface-primary px-3 py-2 text-sm text-ink outline-none focus:border-ink"
+          >
+            {TIER_OPTIONS.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="block">
+          <span className="text-[10px] uppercase tracking-wide text-ink-soft">
+            Status
+          </span>
+          <select
+            value={status}
+            disabled={pending}
+            onChange={(e) =>
+              startTransition(async () => {
+                await setArtistStatus(id, e.target.value as Status);
+                router.refresh();
+              })
+            }
+            className="mt-1 w-full rounded-lg border border-line bg-surface-primary px-3 py-2 text-sm text-ink outline-none focus:border-ink"
+          >
+            {STATUS_OPTIONS.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {confirmRemove ? (
+        <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3">
+          <p className="text-sm text-red-800">
+            Remove {name} from your roster? They keep their account and all their
+            data — they&apos;re just unlinked from you.
+          </p>
+          <div className="mt-2 flex justify-end gap-2">
+            <button
+              onClick={() => setConfirmRemove(false)}
+              className="rounded-lg px-3 py-1.5 text-sm text-ink-soft"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() =>
+                startTransition(async () => {
+                  await removeArtistFromRoster(id);
+                  router.refresh();
+                })
+              }
+              className="rounded-lg bg-red-700 px-3 py-1.5 text-sm text-white"
+            >
+              Remove
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => setConfirmRemove(true)}
+          className="mt-3 text-xs text-red-700 transition-opacity hover:opacity-80"
         >
-          {STATUS_OPTIONS.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
-            </option>
-          ))}
-        </select>
-      </label>
+          Remove from roster
+        </button>
+      )}
     </div>
   );
 }

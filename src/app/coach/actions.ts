@@ -69,6 +69,34 @@ export async function setArtistStatus(artistId: string, status: ArtistStatus) {
   revalidatePath("/");
 }
 
+export async function setArtistTier(artistId: string, tier: ArtistTier) {
+  const { supabase, coachId } = await coachContext();
+  if (!coachId) return;
+  await supabase.from("artists").update({ tier }).eq("id", artistId);
+  revalidatePath("/");
+}
+
+// Unlink an artist from this coach's roster. The artist keeps their account and
+// all their data — they're just no longer assigned to this coach.
+export async function removeArtistFromRoster(artistId: string) {
+  const { userId, coachId } = await coachContext();
+  if (!coachId) return;
+  const admin = createAdminClient();
+  await admin
+    .from("artists")
+    .update({ coach_id: null })
+    .eq("id", artistId)
+    .eq("coach_id", coachId);
+  if (userId) {
+    await admin
+      .from("coach_active_artist")
+      .delete()
+      .eq("coach_user_id", userId)
+      .eq("artist_id", artistId);
+  }
+  revalidatePath("/");
+}
+
 // Link an existing artist account to this coach by their login email. Uses the
 // admin client because a coach can't otherwise see unassigned artists/profiles.
 export async function assignArtistByEmail(
