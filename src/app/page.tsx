@@ -3,7 +3,6 @@ import { SignOut } from "@phosphor-icons/react/dist/ssr";
 import { createClient } from "@/lib/supabase/server";
 import { Logo } from "@/components/Logo";
 import { ArtistCard } from "@/components/coach/ArtistCard";
-import { AssignArtist } from "@/components/coach/AssignArtist";
 import { InviteCodes } from "@/components/coach/InviteCodes";
 import { signOut } from "./actions";
 
@@ -84,9 +83,6 @@ export default async function Home() {
 
         <section className="mt-10">
           <h2 className="font-serif text-2xl text-ink">Your roster</h2>
-          <div className="mt-4">
-            <AssignArtist />
-          </div>
 
           {roster && roster.length > 0 ? (
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -108,8 +104,8 @@ export default async function Home() {
             <div className="mt-5 rounded-2xl border border-dashed border-line p-8 text-center">
               <p className="text-ink">No artists yet.</p>
               <p className="mt-1 text-sm text-ink-soft">
-                Use “Add an artist” to link one by their account email, or send
-                them an invite code.
+                Generate an invite code below and have your artist enter it to
+                link with you.
               </p>
             </div>
           )}

@@ -97,42 +97,9 @@ export async function removeArtistFromRoster(artistId: string) {
   revalidatePath("/");
 }
 
-// Link an existing artist account to this coach by their login email. Uses the
-// admin client because a coach can't otherwise see unassigned artists/profiles.
-export async function assignArtistByEmail(
-  email: string,
-): Promise<{ ok: boolean; error?: string }> {
-  const { userId, coachId } = await coachContext();
-  if (!userId || !coachId) return { ok: false, error: "Not signed in as a coach." };
-  const e = email.trim().toLowerCase();
-  if (!e) return { ok: false, error: "Enter an email." };
-
-  const admin = createAdminClient();
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("id, account_type")
-    .eq("email", e)
-    .maybeSingle();
-  if (!profile || profile.account_type !== "artist") {
-    return { ok: false, error: "No artist account found with that email." };
-  }
-  const { data: artist } = await admin
-    .from("artists")
-    .select("id")
-    .eq("user_id", profile.id)
-    .maybeSingle();
-  if (!artist) return { ok: false, error: "That account has no artist profile." };
-
-  const { error } = await admin
-    .from("artists")
-    .update({ coach_id: coachId, status: "active" })
-    .eq("id", artist.id);
-  if (error) return { ok: false, error: error.message };
-  revalidatePath("/");
-  return { ok: true };
-}
-
 // ---------- Invite codes (Section 5.3) ----------
+// Linking only happens via invite codes — the artist enters the code, so the
+// link is always artist-consented (no linking someone by their email alone).
 
 export async function generateInviteCode(
   tier: ArtistTier,

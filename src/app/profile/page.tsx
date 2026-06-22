@@ -2,9 +2,18 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft, SignOut } from "@phosphor-icons/react/dist/ssr";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { signOut } from "@/app/actions";
 import { EnableNotifications } from "@/components/EnableNotifications";
 import { ProfilePicture } from "@/components/ProfilePicture";
+import { CoachLink } from "@/components/CoachLink";
+
+const TIER_LABEL: Record<string, string> = {
+  free: "Free",
+  self_serve: "Self-serve",
+  diy: "DIY",
+  dwy: "DWY",
+};
 
 export default async function ProfilePage() {
   const supabase = await createClient();
@@ -22,6 +31,35 @@ export default async function ProfilePage() {
   const name = profile?.name?.trim() || "—";
   const role = profile?.account_type ?? "artist";
   const initial = (profile?.name?.trim()?.[0] || "A").toUpperCase();
+
+  // Artist's coach link + plan (coach name looked up via admin — an artist can't
+  // read the coaches table under RLS).
+  let coachName: string | null = null;
+  let tierLabel: string | null = null;
+  if (role === "artist") {
+    const { data: artistRow } = await supabase
+      .from("artists")
+      .select("coach_id, tier")
+      .eq("user_id", userId)
+      .maybeSingle();
+    tierLabel = artistRow?.tier ? (TIER_LABEL[artistRow.tier] ?? artistRow.tier) : null;
+    if (artistRow?.coach_id) {
+      const admin = createAdminClient();
+      const { data: coach } = await admin
+        .from("coaches")
+        .select("user_id")
+        .eq("id", artistRow.coach_id)
+        .maybeSingle();
+      if (coach?.user_id) {
+        const { data: cp } = await admin
+          .from("profiles")
+          .select("name")
+          .eq("id", coach.user_id)
+          .maybeSingle();
+        coachName = cp?.name?.trim() || "Your coach";
+      }
+    }
+  }
 
   return (
     <div className="mx-auto min-h-dvh w-full max-w-md px-5 py-6">
@@ -47,6 +85,39 @@ export default async function ProfilePage() {
         <Row label="Email" value={profile?.email ?? "—"} />
         <Row label="Account" value={role} valueClass="capitalize" />
       </dl>
+
+      {role === "artist" && (
+        <div className="mt-8">
+          <p className="mb-2 text-xs uppercase tracking-[0.18em] text-ink-soft">
+            Coach
+          </p>
+          {coachName ? (
+            <div className="rounded-2xl bg-surface-secondary p-4">
+              <p className="text-sm text-ink-soft">Your coach</p>
+              <p className="font-serif text-xl text-ink">{coachName}</p>
+              <p className="mt-1 text-sm text-ink-soft">
+                Plan: {tierLabel ?? "—"}
+              </p>
+              <details className="mt-3">
+                <summary className="cursor-pointer text-xs text-ink-soft">
+                  Have a different invite code?
+                </summary>
+                <div className="mt-2">
+                  <CoachLink linked />
+                </div>
+              </details>
+            </div>
+          ) : (
+            <div>
+              <p className="mb-2 text-sm text-ink-soft">
+                You&apos;re not linked with a coach yet. Enter the invite code
+                they gave you.
+              </p>
+              <CoachLink linked={false} />
+            </div>
+          )}
+        </div>
+      )}
 
       {role === "artist" && (
         <div className="mt-8">
