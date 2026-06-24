@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeSlash } from "@phosphor-icons/react";
 import { Logo } from "@/components/Logo";
@@ -23,6 +23,13 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [pendingConfirm, setPendingConfirm] = useState<string | null>(null);
+
+  // Surface an error passed back from the email-confirmation route.
+  useEffect(() => {
+    const e = new URLSearchParams(window.location.search).get("error");
+    if (e) setError(e);
+  }, []);
 
   async function applyCodeAndGo() {
     if (inviteCode.trim()) {
@@ -61,7 +68,13 @@ export default function LoginPage() {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { name, account_type: role } },
+      options: {
+        data: { name, account_type: role },
+        emailRedirectTo:
+          typeof window !== "undefined"
+            ? `${window.location.origin}/auth/confirm`
+            : undefined,
+      },
     });
     if (error) {
       setError(error.message);
@@ -72,17 +85,37 @@ export default function LoginPage() {
       await applyCodeAndGo();
       return;
     }
-    // Email confirmation is on — no session yet.
-    setInfo(
-      inviteCode.trim()
-        ? "Account created. Confirm your email, then sign in here with your code to apply it."
-        : "Account created. Check your email to confirm, then sign in.",
-    );
-    setMode("signin");
+    // Email confirmation is on — show a clear "check your inbox" screen.
+    setPendingConfirm(email);
     setLoading(false);
   }
 
   const isSignup = mode === "signup";
+
+  if (pendingConfirm) {
+    return (
+      <div className="grid min-h-dvh place-items-center px-6 py-12">
+        <div className="w-full max-w-sm text-center">
+          <Logo variant="icon" width={56} height={56} />
+          <h1 className="mt-5 font-serif text-3xl text-ink">Check your email</h1>
+          <p className="mt-3 text-sm leading-relaxed text-ink-soft">
+            We sent a confirmation link to{" "}
+            <span className="text-ink">{pendingConfirm}</span>. Open it to finish
+            setting up your account — it&apos;ll bring you right back in.
+          </p>
+          <button
+            onClick={() => {
+              setPendingConfirm(null);
+              setMode("signin");
+            }}
+            className="mt-6 text-sm text-ink underline underline-offset-4"
+          >
+            Back to sign in
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="grid min-h-dvh place-items-center px-6 py-12">
