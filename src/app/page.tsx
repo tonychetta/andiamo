@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { SignOut } from "@phosphor-icons/react/dist/ssr";
 import { createClient } from "@/lib/supabase/server";
@@ -53,9 +54,10 @@ export default async function Home() {
               Log out
             </button>
           </form>
-          <div
-            aria-label="Profile"
-            className="grid h-11 w-11 place-items-center overflow-hidden rounded-full bg-surface-accent font-serif text-lg text-ink"
+          <Link
+            href="/profile"
+            aria-label="Profile and settings"
+            className="grid h-11 w-11 place-items-center overflow-hidden rounded-full bg-surface-accent font-serif text-lg text-ink transition-opacity hover:opacity-80"
           >
             {profile?.profile_picture_url ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -67,7 +69,7 @@ export default async function Home() {
             ) : (
               initial
             )}
-          </div>
+          </Link>
         </div>
       </header>
 

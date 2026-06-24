@@ -1,8 +1,24 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+
+// Permanently delete the signed-in user's account. Cascades through profiles to
+// their coach/artist row and all their data. Artists of a deleted coach are
+// simply unlinked (coach_id set null).
+export async function deleteAccount() {
+  const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  const uid = claims?.claims?.sub as string | undefined;
+  if (uid) {
+    const admin = createAdminClient();
+    await admin.auth.admin.deleteUser(uid);
+    await supabase.auth.signOut();
+  }
+  redirect("/login");
+}
 
 // Surfaces that show the avatar, refreshed after a change.
 function revalidateAvatarSurfaces() {

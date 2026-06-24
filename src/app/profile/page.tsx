@@ -7,6 +7,7 @@ import { signOut } from "@/app/actions";
 import { EnableNotifications } from "@/components/EnableNotifications";
 import { ProfilePicture } from "@/components/ProfilePicture";
 import { CoachLink } from "@/components/CoachLink";
+import { DeleteAccount } from "@/components/DeleteAccount";
 
 const TIER_LABEL: Record<string, string> = {
   free: "Free",
@@ -141,6 +142,10 @@ export default async function ProfilePage() {
           Log out
         </button>
       </form>
+
+      <div className="mt-10 border-t border-line pt-6">
+        <DeleteAccount />
+      </div>
     </div>
   );
 }
