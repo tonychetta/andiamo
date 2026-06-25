@@ -32,10 +32,16 @@ returns setof uuid language sql stable security definer set search_path = '' as 
   where co.user_id = (select auth.uid())
 $$;
 
+-- Only signed-in users may call these (they return data scoped to auth.uid(),
+-- so anon would get nothing, but tighten the surface anyway).
 grant execute on function public.my_coach_ids() to authenticated;
 grant execute on function public.my_artist_ids() to authenticated;
 grant execute on function public.coach_artist_ids() to authenticated;
 grant execute on function public.coached_user_ids() to authenticated;
+revoke execute on function public.my_coach_ids() from anon, public;
+revoke execute on function public.my_artist_ids() from anon, public;
+revoke execute on function public.coach_artist_ids() from anon, public;
+revoke execute on function public.coached_user_ids() from anon, public;
 
 -- Rewrite the recursive policies to use the helper functions.
 drop policy if exists "ac_select_coach" on public.artist_coaches;
