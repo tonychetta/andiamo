@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email";
 import {
   compileWtf,
@@ -38,20 +39,50 @@ export async function generateWtf(): Promise<{ ok: boolean; emailed: boolean }> 
     payload: compiled as unknown as Json,
   });
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("email, name")
-    .eq("id", userId)
-    .maybeSingle();
+  // The WTF goes to the artist AND every coach assigned to them. We gather
+  // recipients with the admin client so it works no matter who clicked Generate
+  // (the artist themselves, or a coach impersonating them) and isn't limited by
+  // who each role can read under RLS.
+  const admin = createAdminClient();
+  const recipients = new Set<string>();
+  let artistName = "";
 
+  const { data: artistRow } = await admin
+    .from("artists")
+    .select("artist_name, user_id")
+    .eq("id", aid as string)
+    .maybeSingle();
+  artistName = artistRow?.artist_name ?? "";
+  if (artistRow?.user_id) {
+    const { data: ap } = await admin
+      .from("profiles")
+      .select("email")
+      .eq("id", artistRow.user_id)
+      .maybeSingle();
+    if (ap?.email) recipients.add(ap.email);
+  }
+
+  const { data: links } = await admin
+    .from("artist_coaches")
+    .select("coaches(user_id)")
+    .eq("artist_id", aid as string);
+  const coachUserIds = (links ?? [])
+    .map((l) => (l.coaches as { user_id: string } | null)?.user_id)
+    .filter(Boolean) as string[];
+  if (coachUserIds.length) {
+    const { data: coachProfiles } = await admin
+      .from("profiles")
+      .select("email")
+      .in("id", coachUserIds);
+    for (const c of coachProfiles ?? []) if (c.email) recipients.add(c.email);
+  }
+
+  const subject = `WTF // Week of ${weekLabel(start, end)}`;
+  const html = buildWtfHtml(compiled, artistName);
   let emailed = false;
-  if (profile?.email) {
-    const r = await sendEmail({
-      to: profile.email,
-      subject: `WTF // Week of ${weekLabel(start, end)}`,
-      html: buildWtfHtml(compiled, profile.name ?? ""),
-    });
-    emailed = r.ok;
+  for (const to of recipients) {
+    const r = await sendEmail({ to, subject, html });
+    emailed = emailed || r.ok;
   }
 
   revalidatePath("/wtf");
