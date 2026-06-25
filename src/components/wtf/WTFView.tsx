@@ -308,7 +308,7 @@ export function WTFView({
               ? "WTF Sent ✓"
               : sent === "no-email"
                 ? "WTF Sent · email failed"
-                : "Generate Weekly Task Form"}
+                : "Send WTF"}
         </button>
         {sent === "no-email" && (
           <p className="mt-2 text-center text-xs text-ink-soft">

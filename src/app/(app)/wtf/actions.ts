@@ -64,21 +64,30 @@ export async function generateWtf(): Promise<{ ok: boolean; emailed: boolean }> 
 
   const { data: links } = await admin
     .from("artist_coaches")
-    .select("coaches(user_id)")
+    .select("coaches(id, user_id)")
     .eq("artist_id", aid as string);
-  const coachUserIds = (links ?? [])
-    .map((l) => (l.coaches as { user_id: string } | null)?.user_id)
-    .filter(Boolean) as string[];
-  if (coachUserIds.length) {
+  const coachRows = (links ?? [])
+    .map((l) => l.coaches as { id: string; user_id: string } | null)
+    .filter(Boolean) as { id: string; user_id: string }[];
+  let coaches: { id: string; name: string }[] = [];
+  if (coachRows.length) {
     const { data: coachProfiles } = await admin
       .from("profiles")
-      .select("email")
-      .in("id", coachUserIds);
-    for (const c of coachProfiles ?? []) if (c.email) recipients.add(c.email);
+      .select("id, email, name")
+      .in(
+        "id",
+        coachRows.map((c) => c.user_id),
+      );
+    const byUserId = new Map((coachProfiles ?? []).map((p) => [p.id, p]));
+    for (const p of coachProfiles ?? []) if (p.email) recipients.add(p.email);
+    coaches = coachRows.map((c) => ({
+      id: c.id,
+      name: byUserId.get(c.user_id)?.name?.trim() || "Coach",
+    }));
   }
 
   const subject = `WTF // Week of ${weekLabel(start, end)}`;
-  const html = buildWtfHtml(compiled, artistName);
+  const html = buildWtfHtml(compiled, artistName, coaches);
   let emailed = false;
   for (const to of recipients) {
     const r = await sendEmail({ to, subject, html });

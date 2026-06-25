@@ -147,9 +147,13 @@ export function weekLabel(start: string, end: string): string {
 }
 
 // Branded HTML email for the WTF (inline styles for email-client safety).
-export function buildWtfHtml(w: CompiledWtf, artistName: string): string {
-  const priority = w.milestones.find((m) => m.priority);
-  const rest = w.milestones.filter((m) => !m.priority);
+// When coaches are assigned, Milestone Tasks are split into an Artist section
+// and one section per coach, mirroring the in-app WTF.
+export function buildWtfHtml(
+  w: CompiledWtf,
+  artistName: string,
+  coaches: { id: string; name: string }[] = [],
+): string {
   const ink = "#2c2522";
   const soft = "#7a716b";
   const gold = "#c7a35c";
@@ -169,9 +173,31 @@ export function buildWtfHtml(w: CompiledWtf, artistName: string): string {
       ? `<tr><td style="padding:18px 0 6px;"><div style="color:${soft};font-size:11px;letter-spacing:2px;text-transform:uppercase;">${title}</div></td></tr>${rows}`
       : "";
 
-  const milestoneRows =
-    (priority ? li(priority.description, priority.goalLabel, true) : "") +
-    rest.map((m) => li(m.description, m.goalLabel)).join("");
+  const groupRows = (tasks: CompiledWtf["milestones"]) =>
+    tasks.map((m) => li(m.description, m.goalLabel, m.priority)).join("");
+
+  const coachIds = new Set(coaches.map((c) => c.id));
+  // Tasks with no coach (or an unknown/removed coach) belong to the artist.
+  const artistTasks = w.milestones.filter(
+    (m) => !m.assignedCoachId || !coachIds.has(m.assignedCoachId),
+  );
+
+  // No coaches assigned → single "Milestone Tasks" list (DIY-style).
+  // Coaches assigned → split by assignee.
+  const milestoneSections = coaches.length
+    ? section(`${artistName || "Artist"} (Artist)`, groupRows(artistTasks)) +
+      coaches
+        .map((c) =>
+          section(
+            `${c.name} (Coach)`,
+            groupRows(
+              w.milestones.filter((m) => m.assignedCoachId === c.id),
+            ),
+          ),
+        )
+        .join("")
+    : section("Milestone Tasks", groupRows(w.milestones));
+
   const releaseRows = w.releases
     .map((r) => li(r.description, r.releaseTitle))
     .join("");
@@ -212,11 +238,11 @@ export function buildWtfHtml(w: CompiledWtf, artistName: string): string {
           <div style="font-family:Georgia,'Times New Roman',serif;font-size:30px;color:${ink};margin-top:6px;">WTF // Week of ${weekLabel(w.weekStart, w.weekEnd)}</div>
           ${artistName ? `<div style="color:${soft};font-size:14px;margin-top:4px;">${artistName}</div>` : ""}
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-            ${section("Milestone Tasks", milestoneRows)}
+            ${milestoneSections}
             ${section("Release Tasks", releaseRows)}
             ${contentCalendar}
             ${
-              !milestoneRows && !releaseRows && !w.content.length
+              !w.milestones.length && !releaseRows && !w.content.length
                 ? `<tr><td style="padding:18px 0;color:${soft};font-size:14px;">No tasks on the WTF this week.</td></tr>`
                 : ""
             }
