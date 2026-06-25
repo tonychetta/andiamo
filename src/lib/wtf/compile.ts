@@ -11,7 +11,7 @@ export type CompiledWtf = {
     status: string;
     priority: boolean;
     goalLabel: string;
-    assignee: string;
+    assignedCoachId: string | null;
     pushReason: string | null;
   }[];
   releases: {
@@ -69,7 +69,7 @@ export async function compileWtf(
     supabase
       .from("tasks")
       .select(
-        "id, description, status, wtf_priority, assigned_to, push_reason, display_order, milestones(goals(category))",
+        "id, description, status, wtf_priority, assigned_coach_id, push_reason, display_order, milestones(goals(category))",
       )
       .eq("on_wtf", true)
       .order("display_order", { ascending: true }),
@@ -99,7 +99,7 @@ export async function compileWtf(
       status: t.status as string,
       priority: t.wtf_priority,
       goalLabel: GOAL_LABEL[ms?.goals?.category ?? ""] ?? "",
-      assignee: t.assigned_to as string,
+      assignedCoachId: t.assigned_coach_id ?? null,
       pushReason: t.push_reason ?? null,
     };
   });

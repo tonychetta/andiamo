@@ -100,6 +100,39 @@ export type Database = {
           },
         ]
       }
+      artist_coaches: {
+        Row: {
+          artist_id: string
+          coach_id: string
+          created_at: string
+        }
+        Insert: {
+          artist_id: string
+          coach_id: string
+          created_at?: string
+        }
+        Update: {
+          artist_id?: string
+          coach_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "artist_coaches_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "artists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "artist_coaches_coach_id_fkey"
+            columns: ["coach_id"]
+            isOneToOne: false
+            referencedRelation: "coaches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       coaches: {
         Row: {
           bio: string | null
@@ -768,6 +801,7 @@ export type Database = {
       tasks: {
         Row: {
           artist_id: string
+          assigned_coach_id: string | null
           assigned_to: Database["public"]["Enums"]["task_assignee"]
           completed_at: string | null
           created_at: string
@@ -786,6 +820,7 @@ export type Database = {
         }
         Insert: {
           artist_id: string
+          assigned_coach_id?: string | null
           assigned_to?: Database["public"]["Enums"]["task_assignee"]
           completed_at?: string | null
           created_at?: string
@@ -804,6 +839,7 @@ export type Database = {
         }
         Update: {
           artist_id?: string
+          assigned_coach_id?: string | null
           assigned_to?: Database["public"]["Enums"]["task_assignee"]
           completed_at?: string | null
           created_at?: string

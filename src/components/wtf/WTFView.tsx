@@ -27,9 +27,10 @@ type Milestone = {
   status: string;
   priority: boolean;
   goalLabel: string;
-  assignee: string;
+  assignedCoachId: string | null;
   pushReason: string | null;
 };
+type Coach = { id: string; name: string };
 
 const PUSH_REASONS = [
   "Task wasn't broken down enough",
@@ -96,12 +97,16 @@ export function WTFView({
   history,
   isCoach = false,
   tier = "diy",
+  artistName = "Artist",
+  coaches = [],
 }: {
   label: string;
   compiled: Compiled;
   history: HistoryRow[];
   isCoach?: boolean;
   tier?: string;
+  artistName?: string;
+  coaches?: Coach[];
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -159,12 +164,12 @@ export function WTFView({
       ) : (
         <div className="mt-6 space-y-6">
           {milestones.length > 0 &&
-            (tier === "dwy" ? (
+            (tier === "dwy" && coaches.length > 0 ? (
               <>
-                {milestones.filter((m) => m.assignee !== "coach").length > 0 && (
-                  <Section title="Milestone Tasks · Artist">
+                {milestones.filter((m) => !m.assignedCoachId).length > 0 && (
+                  <Section title={`${artistName} (Artist)`}>
                     {milestones
-                      .filter((m) => m.assignee !== "coach")
+                      .filter((m) => !m.assignedCoachId)
                       .map((m) => (
                         <MilestoneRow
                           key={m.id}
@@ -172,25 +177,31 @@ export function WTFView({
                           onRun={run}
                           showAssign
                           isCoach={isCoach}
+                          coaches={coaches}
+                          artistName={artistName}
                         />
                       ))}
                   </Section>
                 )}
-                {milestones.filter((m) => m.assignee === "coach").length > 0 && (
-                  <Section title="Milestone Tasks · Coach">
-                    {milestones
-                      .filter((m) => m.assignee === "coach")
-                      .map((m) => (
+                {coaches.map((c) => {
+                  const cm = milestones.filter((m) => m.assignedCoachId === c.id);
+                  if (cm.length === 0) return null;
+                  return (
+                    <Section key={c.id} title={`${c.name} (Coach)`}>
+                      {cm.map((m) => (
                         <MilestoneRow
                           key={m.id}
                           m={m}
                           onRun={run}
                           showAssign
                           isCoach={isCoach}
+                          coaches={coaches}
+                          artistName={artistName}
                         />
                       ))}
-                  </Section>
-                )}
+                    </Section>
+                  );
+                })}
               </>
             ) : (
               <Section title="Milestone Tasks">
@@ -201,6 +212,8 @@ export function WTFView({
                     onRun={run}
                     showAssign={false}
                     isCoach={isCoach}
+                    coaches={coaches}
+                    artistName={artistName}
                   />
                 ))}
               </Section>
@@ -352,11 +365,15 @@ function MilestoneRow({
   onRun,
   showAssign,
   isCoach,
+  coaches,
+  artistName,
 }: {
   m: Milestone;
   onRun: (fn: () => Promise<unknown>) => void;
   showAssign: boolean;
   isCoach: boolean;
+  coaches: Coach[];
+  artistName: string;
 }) {
   const [menu, setMenu] = useState(false);
   const done = isDone(m.status);
@@ -427,12 +444,17 @@ function MilestoneRow({
             {showAssign && (
               <>
                 <div className="my-1 border-t border-line" />
-                <Item onClick={() => act(() => setTaskAssignee(m.id, "artist"))}>
-                  Assign to Artist
+                <Item onClick={() => act(() => setTaskAssignee(m.id, null))}>
+                  Assign to {artistName}
                 </Item>
-                <Item onClick={() => act(() => setTaskAssignee(m.id, "coach"))}>
-                  Assign to Coach
-                </Item>
+                {coaches.map((c) => (
+                  <Item
+                    key={c.id}
+                    onClick={() => act(() => setTaskAssignee(m.id, c.id))}
+                  >
+                    Assign to {c.name}
+                  </Item>
+                ))}
               </>
             )}
             <div className="my-1 border-t border-line" />

@@ -77,16 +77,22 @@ export async function setArtistTier(artistId: string, tier: ArtistTier) {
 }
 
 // Unlink an artist from this coach's roster. The artist keeps their account and
-// all their data — they're just no longer assigned to this coach.
+// all their data — and any other coaches stay assigned.
 export async function removeArtistFromRoster(artistId: string) {
   const { userId, coachId } = await coachContext();
   if (!coachId) return;
   const admin = createAdminClient();
   await admin
-    .from("artists")
-    .update({ coach_id: null })
-    .eq("id", artistId)
+    .from("artist_coaches")
+    .delete()
+    .eq("artist_id", artistId)
     .eq("coach_id", coachId);
+  // Drop any tasks that were assigned to this coach back to the artist.
+  await admin
+    .from("tasks")
+    .update({ assigned_coach_id: null })
+    .eq("artist_id", artistId)
+    .eq("assigned_coach_id", coachId);
   if (userId) {
     await admin
       .from("coach_active_artist")
@@ -159,12 +165,17 @@ export async function redeemInviteCode(
   await admin
     .from("artists")
     .update({
-      coach_id: ic.coach_id,
       tier: ic.tier,
       status: "active",
       subscription_status: ic.billing_bypass ? "comp" : "standard",
     })
     .eq("id", artist.id);
+  await admin
+    .from("artist_coaches")
+    .upsert(
+      { artist_id: artist.id, coach_id: ic.coach_id },
+      { onConflict: "artist_id,coach_id" },
+    );
   await admin
     .from("invite_codes")
     .update({ used_by: uid, used_at: new Date().toISOString() })

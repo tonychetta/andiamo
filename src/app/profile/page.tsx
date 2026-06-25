@@ -33,31 +33,32 @@ export default async function ProfilePage() {
   const role = profile?.account_type ?? "artist";
   const initial = (profile?.name?.trim()?.[0] || "A").toUpperCase();
 
-  // Artist's coach link + plan (coach name looked up via admin — an artist can't
-  // read the coaches table under RLS).
-  let coachName: string | null = null;
+  // Artist's coaches + plan (coach names looked up via admin — an artist can't
+  // read the coaches table under RLS). An artist can have several coaches.
+  let coachNames: string[] = [];
   let tierLabel: string | null = null;
   if (role === "artist") {
     const { data: artistRow } = await supabase
       .from("artists")
-      .select("coach_id, tier")
+      .select("id, tier")
       .eq("user_id", userId)
       .maybeSingle();
     tierLabel = artistRow?.tier ? (TIER_LABEL[artistRow.tier] ?? artistRow.tier) : null;
-    if (artistRow?.coach_id) {
+    if (artistRow?.id) {
       const admin = createAdminClient();
-      const { data: coach } = await admin
-        .from("coaches")
-        .select("user_id")
-        .eq("id", artistRow.coach_id)
-        .maybeSingle();
-      if (coach?.user_id) {
-        const { data: cp } = await admin
+      const { data: links } = await admin
+        .from("artist_coaches")
+        .select("coaches(user_id)")
+        .eq("artist_id", artistRow.id);
+      const userIds = (links ?? [])
+        .map((l) => (l.coaches as { user_id: string } | null)?.user_id)
+        .filter(Boolean) as string[];
+      if (userIds.length) {
+        const { data: profs } = await admin
           .from("profiles")
           .select("name")
-          .eq("id", coach.user_id)
-          .maybeSingle();
-        coachName = cp?.name?.trim() || "Your coach";
+          .in("id", userIds);
+        coachNames = (profs ?? []).map((p) => p.name?.trim() || "Coach");
       }
     }
   }
@@ -92,16 +93,20 @@ export default async function ProfilePage() {
           <p className="mb-2 text-xs uppercase tracking-[0.18em] text-ink-soft">
             Coach
           </p>
-          {coachName ? (
+          {coachNames.length > 0 ? (
             <div className="rounded-2xl bg-surface-secondary p-4">
-              <p className="text-sm text-ink-soft">Your coach</p>
-              <p className="font-serif text-xl text-ink">{coachName}</p>
+              <p className="text-sm text-ink-soft">
+                {coachNames.length > 1 ? "Your coaches" : "Your coach"}
+              </p>
+              <p className="font-serif text-xl text-ink">
+                {coachNames.join(", ")}
+              </p>
               <p className="mt-1 text-sm text-ink-soft">
                 Plan: {tierLabel ?? "—"}
               </p>
               <details className="mt-3">
                 <summary className="cursor-pointer text-xs text-ink-soft">
-                  Have a different invite code?
+                  Add another coach (enter an invite code)
                 </summary>
                 <div className="mt-2">
                   <CoachLink linked />

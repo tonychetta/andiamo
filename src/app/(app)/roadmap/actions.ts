@@ -254,15 +254,12 @@ export async function setTaskPriority(taskId: string) {
   revalidatePath("/wtf");
 }
 
-// DWY: assign a WTF task to the artist or the coach (Section 14.4).
-export async function setTaskAssignee(
-  taskId: string,
-  assignee: "artist" | "coach" | "both",
-) {
+// DWY: assign a WTF task to a specific coach, or back to the artist (null).
+export async function setTaskAssignee(taskId: string, coachId: string | null) {
   const supabase = await createClient();
   const { error } = await supabase
     .from("tasks")
-    .update({ assigned_to: assignee })
+    .update({ assigned_coach_id: coachId })
     .eq("id", taskId);
   if (error) throw new Error(error.message);
   revalidatePath("/wtf");
