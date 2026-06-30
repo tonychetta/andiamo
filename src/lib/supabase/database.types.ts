@@ -394,7 +394,7 @@ export type Database = {
           coach_id: string
           code: string
           created_at: string
-          expires_at: string
+          expires_at: string | null
           id: string
           tier: Database["public"]["Enums"]["artist_tier"]
           used_at: string | null
@@ -405,7 +405,7 @@ export type Database = {
           coach_id: string
           code: string
           created_at?: string
-          expires_at?: string
+          expires_at?: string | null
           id?: string
           tier?: Database["public"]["Enums"]["artist_tier"]
           used_at?: string | null
@@ -416,7 +416,7 @@ export type Database = {
           coach_id?: string
           code?: string
           created_at?: string
-          expires_at?: string
+          expires_at?: string | null
           id?: string
           tier?: Database["public"]["Enums"]["artist_tier"]
           used_at?: string | null

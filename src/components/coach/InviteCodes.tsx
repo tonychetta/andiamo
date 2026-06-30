@@ -16,7 +16,7 @@ type Code = {
   billing_bypass: boolean;
   used_by: string | null;
   used_at: string | null;
-  expires_at: string;
+  expires_at: string | null;
 };
 
 const TIERS: { value: Tier; label: string }[] = [
@@ -42,8 +42,8 @@ export function InviteCodes({ codes }: { codes: Code[] }) {
 
   function status(c: Code): string {
     if (c.used_by) return "Used";
-    if (new Date(c.expires_at) < new Date()) return "Expired";
-    return `Active · expires ${new Date(c.expires_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+    if (c.expires_at && new Date(c.expires_at) < new Date()) return "Expired";
+    return "Active";
   }
 
   return (
@@ -85,7 +85,9 @@ export function InviteCodes({ codes }: { codes: Code[] }) {
       {codes.length > 0 && (
         <div className="mt-4 space-y-2">
           {codes.map((c) => {
-            const inactive = !!c.used_by || new Date(c.expires_at) < new Date();
+            const inactive =
+              !!c.used_by ||
+              (!!c.expires_at && new Date(c.expires_at) < new Date());
             return (
               <div
                 key={c.id}

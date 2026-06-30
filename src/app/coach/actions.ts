@@ -152,7 +152,7 @@ export async function redeemInviteCode(
     .maybeSingle();
   if (!ic) return { ok: false, error: "Invalid invite code." };
   if (ic.used_by) return { ok: false, error: "This code has already been used." };
-  if (new Date(ic.expires_at) < new Date())
+  if (ic.expires_at && new Date(ic.expires_at) < new Date())
     return { ok: false, error: "This code has expired." };
 
   const { data: artist } = await admin
