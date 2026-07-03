@@ -87,16 +87,52 @@ export function VisionView({
             <p className="text-xs uppercase tracking-[0.18em] text-ink-soft">
               {CATEGORY_LABEL[goal.category] ?? goal.category}
             </p>
-            <EditableBlock
-              value={goal.description}
-              onSave={(text) => updateGoalDescription(goal.id, text)}
-              render={(text) => (
-                <p className="mt-2 leading-relaxed text-ink">{text}</p>
-              )}
-            />
+            {canEdit ? (
+              <EditableBlock
+                value={goal.description}
+                onSave={(text) => updateGoalDescription(goal.id, text)}
+                render={(text) => (
+                  <p className="mt-2 leading-relaxed text-ink">{text}</p>
+                )}
+              />
+            ) : (
+              <p className="mt-2 leading-relaxed text-ink">{goal.description}</p>
+            )}
           </div>
         ))}
       </div>
+
+      {/* Full Vision Builder conversation — read-only, for a coach reviewing
+          the thinking behind the Vision. The artist reopens it via "Refine". */}
+      {!canEdit && transcript.length > 0 && (
+        <details className="mt-12">
+          <summary className="cursor-pointer list-none font-serif text-xl text-ink">
+            Vision Builder conversation
+            <span className="ml-2 align-middle text-sm text-ink-soft">
+              ({transcript.length} messages)
+            </span>
+          </summary>
+          <div className="mt-4 space-y-3">
+            {transcript.map((turn, i) => (
+              <div
+                key={i}
+                className={
+                  turn.role === "user"
+                    ? "ml-6 rounded-2xl rounded-tr-sm bg-surface-accent px-4 py-3"
+                    : "mr-6 rounded-2xl rounded-tl-sm bg-surface-secondary px-4 py-3"
+                }
+              >
+                <p className="mb-1 text-[11px] uppercase tracking-[0.15em] text-ink-soft">
+                  {turn.role === "user" ? "Artist" : "Andiamo"}
+                </p>
+                <p className="whitespace-pre-wrap leading-relaxed text-ink">
+                  {turn.content}
+                </p>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
     </div>
   );
 }
