@@ -25,11 +25,13 @@ export function VisionView({
   goals,
   transcript,
   canEdit = true,
+  artistName = "Artist",
 }: {
   vision: Vision;
   goals: Goal[];
   transcript: Turn[];
   canEdit?: boolean;
+  artistName?: string;
 }) {
   const [mode, setMode] = useState<"vision" | "builder">("vision");
 
@@ -123,7 +125,7 @@ export function VisionView({
                 }
               >
                 <p className="mb-1 text-[11px] uppercase tracking-[0.15em] text-ink-soft">
-                  {turn.role === "user" ? "Artist" : "Andiamo"}
+                  {turn.role === "user" ? artistName : "Andiamo"}
                 </p>
                 <p className="whitespace-pre-wrap leading-relaxed text-ink">
                   {turn.content}

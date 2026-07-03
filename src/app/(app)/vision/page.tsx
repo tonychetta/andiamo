@@ -19,9 +19,12 @@ export default async function VisionPage() {
   // RLS scopes this to the current artist's Vision (own, or the coach's active).
   const { data: vision } = await supabase
     .from("visions")
-    .select("id, statement_text")
+    .select("id, statement_text, artists(artist_name)")
     .eq("is_current", true)
     .maybeSingle();
+  const artistName =
+    (vision?.artists as { artist_name?: string } | null)?.artist_name?.trim() ||
+    "Artist";
 
   if (!vision) {
     if (canEdit) return <VisionBuilder />;
@@ -61,6 +64,7 @@ export default async function VisionPage() {
       goals={goals ?? []}
       transcript={transcript}
       canEdit={canEdit}
+      artistName={artistName}
     />
   );
 }
