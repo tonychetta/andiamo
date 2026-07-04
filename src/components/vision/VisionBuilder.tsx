@@ -28,6 +28,8 @@ export function VisionBuilder({
   const [ready, setReady] = useState(false);
   const [gen, setGen] = useState<GenState>("idle");
   const [error, setError] = useState<string | null>(null);
+  // Height of the on-screen keyboard, so the composer rides above it on mobile.
+  const [kbInset, setKbInset] = useState(0);
 
   const endRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -35,6 +37,25 @@ export function VisionBuilder({
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, thinking]);
+
+  // The builder is a full-screen `fixed` layer, which iOS does NOT shrink when
+  // the keyboard opens — so the composer would sit hidden behind it. Track the
+  // keyboard height via the visual viewport and lift the whole layer above it.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => {
+      const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      setKbInset(kb);
+    };
+    onResize();
+    vv.addEventListener("resize", onResize);
+    vv.addEventListener("scroll", onResize);
+    return () => {
+      vv.removeEventListener("resize", onResize);
+      vv.removeEventListener("scroll", onResize);
+    };
+  }, []);
 
   // Grow the text box as the artist types, and keep the last message visible
   // (so the composer never hides what they're responding to).
@@ -136,7 +157,10 @@ export function VisionBuilder({
 
   // The conversation — a quiet, full-screen night space.
   return (
-    <div className="fixed inset-0 z-20 flex flex-col bg-surface-night">
+    <div
+      className="fixed inset-0 z-20 flex flex-col bg-surface-night"
+      style={{ paddingBottom: kbInset }}
+    >
       {/* Toggle back to the Vision (only when one already exists) */}
       {onViewVision && (
         <button
@@ -179,8 +203,13 @@ export function VisionBuilder({
         </div>
       </div>
 
-      {/* Composer */}
-      <div className="mx-auto w-full max-w-md px-5 pb-24 pt-2">
+      {/* Composer — clears the bottom nav normally; sits right above the
+          keyboard when it's open (nav is hidden behind it then). */}
+      <div
+        className={`mx-auto w-full max-w-md px-5 pt-2 ${
+          kbInset > 0 ? "pb-3" : "pb-24"
+        }`}
+      >
         {error && (
           <div className="mb-3 flex items-center justify-between gap-3">
             <p className="text-sm text-red-400">{error}</p>

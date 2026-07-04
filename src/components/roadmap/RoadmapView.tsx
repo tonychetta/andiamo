@@ -414,6 +414,7 @@ function FutureCard({
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [editing, setEditing] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [draft, setDraft] = useState(milestone.description);
 
   // Long-press → begin a drag on THIS card with the same finger (no lift).
@@ -488,7 +489,9 @@ function FutureCard({
       style={{
         position: "relative",
         marginBottom,
-        zIndex: expanded ? 25 : 10 - d,
+        // An open menu overflows onto the card below, so lift this card above
+        // its siblings while the menu is open.
+        zIndex: menuOpen ? 60 : expanded ? 25 : 10 - d,
         transition: still ? "none" : `margin-bottom 0.8s ${glide}`,
       }}
     >
@@ -562,6 +565,7 @@ function FutureCard({
               <MilestoneMenu
                 onEdit={() => setEditing(true)}
                 onMakeNext={onMakeNext}
+                onOpenChange={setMenuOpen}
                 onDelete={() =>
                   startTransition(async () => {
                     await deleteMilestone(milestone.id);
@@ -1067,12 +1071,19 @@ function MilestoneMenu({
   onEdit,
   onMakeNext,
   onDelete,
+  onOpenChange,
 }: {
   onEdit: () => void;
   onMakeNext?: () => void;
   onDelete: () => void;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpenState] = useState(false);
+  const setOpen = (v: boolean | ((o: boolean) => boolean)) => {
+    const next = typeof v === "function" ? v(open) : v;
+    setOpenState(next);
+    onOpenChange?.(next);
+  };
   return (
     <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
       <button
