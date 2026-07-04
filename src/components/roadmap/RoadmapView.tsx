@@ -7,6 +7,7 @@ import {
   useState,
   useTransition,
 } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -226,14 +227,19 @@ function MilestoneStack({ goal }: { goal: Goal }) {
   const [, startTransition] = useTransition();
 
   const { sorted, next, futures, futuresFurthestFirst } = deriveStack(goal);
-  const futuresKey = futuresFurthestFirst.map((m) => m.id).join(",");
+  // Order/identity of the future cards (for detecting reorders).
+  const futuresIdKey = futuresFurthestFirst.map((m) => m.id).join(",");
+  // Also track descriptions so an edit (same ids) still re-syncs the cards.
+  const futuresSyncKey = futuresFurthestFirst
+    .map((m) => `${m.id}:${m.description}`)
+    .join("|");
 
   // Keep the working order in sync with the server whenever it changes — but
   // never yank it out from under an in-progress drag.
   useEffect(() => {
     if (!reordering) setOrder(deriveStack(goal).futuresFurthestFirst);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [futuresKey, reordering]);
+  }, [futuresSyncKey, reordering]);
 
   // NOTE: these stay attached even during reorder. Removing the handler mid-touch
   // orphans framer's pan listeners (the scroll-during-drag blocker never cleans
@@ -273,7 +279,7 @@ function MilestoneStack({ goal }: { goal: Goal }) {
   function dropReorder() {
     setReordering(false);
     const now = order.map((m) => m.id).join(",");
-    if (now === futuresKey) return;
+    if (now === futuresIdKey) return;
     const nearestFirst = [next.id, ...[...order].reverse().map((m) => m.id)];
     startTransition(async () => {
       await reorderMilestones(goal.id, nearestFirst);
@@ -414,7 +420,6 @@ function FutureCard({
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [editing, setEditing] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [draft, setDraft] = useState(milestone.description);
 
   // Long-press → begin a drag on THIS card with the same finger (no lift).
@@ -489,9 +494,7 @@ function FutureCard({
       style={{
         position: "relative",
         marginBottom,
-        // An open menu overflows onto the card below, so lift this card above
-        // its siblings while the menu is open.
-        zIndex: menuOpen ? 60 : expanded ? 25 : 10 - d,
+        zIndex: expanded ? 25 : 10 - d,
         transition: still ? "none" : `margin-bottom 0.8s ${glide}`,
       }}
     >
@@ -565,7 +568,6 @@ function FutureCard({
               <MilestoneMenu
                 onEdit={() => setEditing(true)}
                 onMakeNext={onMakeNext}
-                onOpenChange={setMenuOpen}
                 onDelete={() =>
                   startTransition(async () => {
                     await deleteMilestone(milestone.id);
@@ -1071,62 +1073,83 @@ function MilestoneMenu({
   onEdit,
   onMakeNext,
   onDelete,
-  onOpenChange,
 }: {
   onEdit: () => void;
   onMakeNext?: () => void;
   onDelete: () => void;
-  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpenState] = useState(false);
-  const setOpen = (v: boolean | ((o: boolean) => boolean)) => {
-    const next = typeof v === "function" ? v(open) : v;
-    setOpenState(next);
-    onOpenChange?.(next);
-  };
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  // Anchor the menu to the button's on-screen position. The cards live inside
+  // framer's transformed/stacked layers, which trap a normal absolute dropdown
+  // behind sibling cards — so we portal it to <body> and position it fixed.
+  const [coords, setCoords] = useState<{ top: number; right: number } | null>(
+    null,
+  );
+
+  function toggle() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    const r = btnRef.current?.getBoundingClientRect();
+    if (r) setCoords({ top: r.bottom + 6, right: window.innerWidth - r.right });
+    setOpen(true);
+  }
+
   return (
-    <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
+    <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
       <button
-        onClick={() => setOpen((o) => !o)}
+        ref={btnRef}
+        onClick={toggle}
         aria-label="Milestone options"
         className="text-ink-soft transition-colors hover:text-ink"
       >
         <DotsThree size={20} weight="bold" />
       </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-7 z-50 w-48 overflow-hidden rounded-xl border border-line bg-surface-primary py-1 shadow-lg">
-            <MenuItem
-              onClick={() => {
-                setOpen(false);
-                onEdit();
-              }}
+      {open &&
+        coords &&
+        createPortal(
+          <>
+            <div
+              className="fixed inset-0 z-[90]"
+              onClick={() => setOpen(false)}
+            />
+            <div
+              className="fixed z-[100] w-48 overflow-hidden rounded-xl border border-line bg-surface-primary py-1 shadow-lg"
+              style={{ top: coords.top, right: coords.right }}
             >
-              Edit
-            </MenuItem>
-            {onMakeNext && (
               <MenuItem
                 onClick={() => {
                   setOpen(false);
-                  onMakeNext();
+                  onEdit();
                 }}
               >
-                Make Next Milestone
+                Edit
               </MenuItem>
-            )}
-            <MenuItem
-              danger
-              onClick={() => {
-                setOpen(false);
-                onDelete();
-              }}
-            >
-              Delete
-            </MenuItem>
-          </div>
-        </>
-      )}
+              {onMakeNext && (
+                <MenuItem
+                  onClick={() => {
+                    setOpen(false);
+                    onMakeNext();
+                  }}
+                >
+                  Make Next Milestone
+                </MenuItem>
+              )}
+              <MenuItem
+                danger
+                onClick={() => {
+                  setOpen(false);
+                  onDelete();
+                }}
+              >
+                Delete
+              </MenuItem>
+            </div>
+          </>,
+          document.body,
+        )}
     </div>
   );
 }
