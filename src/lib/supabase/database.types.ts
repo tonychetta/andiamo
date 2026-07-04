@@ -672,7 +672,7 @@ export type Database = {
           mgmt_link: string | null
           notes: string | null
           parent_release_id: string | null
-          release_date: string
+          release_date: string | null
           release_type: Database["public"]["Enums"]["release_type"]
           title: string
           updated_at: string
@@ -684,7 +684,7 @@ export type Database = {
           mgmt_link?: string | null
           notes?: string | null
           parent_release_id?: string | null
-          release_date: string
+          release_date?: string | null
           release_type?: Database["public"]["Enums"]["release_type"]
           title?: string
           updated_at?: string
@@ -696,7 +696,7 @@ export type Database = {
           mgmt_link?: string | null
           notes?: string | null
           parent_release_id?: string | null
-          release_date?: string
+          release_date?: string | null
           release_type?: Database["public"]["Enums"]["release_type"]
           title?: string
           updated_at?: string

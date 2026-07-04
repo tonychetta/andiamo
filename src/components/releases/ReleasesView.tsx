@@ -46,7 +46,7 @@ type Release = {
   id: string;
   title: string;
   release_type: ReleaseType;
-  release_date: string;
+  release_date: string | null;
   notes: string | null;
   mgmt_link: string | null;
   parent_release_id: string | null;
@@ -58,7 +58,7 @@ type ReleaseLite = {
   id: string;
   title: string;
   release_type: ReleaseType;
-  release_date: string;
+  release_date: string | null;
   parent_release_id: string | null;
 };
 
@@ -120,10 +120,16 @@ export function ReleasesView({
   const [showPast, setShowPast] = useState(false);
   const [editingTemplates, setEditingTemplates] = useState(false);
 
-  const upcoming = releases.filter((r) => dayDiff(today, r.release_date) >= 0);
+  // Releases with no date yet — planned but not scheduled. Shown at the top so
+  // they're easy to come back and schedule.
+  const unscheduled = releases.filter((r) => !r.release_date);
+  const upcoming = releases.filter(
+    (r) => r.release_date && dayDiff(today, r.release_date) >= 0,
+  );
   const past = releases
-    .filter((r) => dayDiff(today, r.release_date) < 0)
+    .filter((r) => r.release_date && dayDiff(today, r.release_date) < 0)
     .reverse(); // most-recently-released first
+  const active = [...unscheduled, ...upcoming];
 
   // Every release in lite form, so a card can resolve its project/single links.
   const siblings: ReleaseLite[] = releases.map((r) => ({
@@ -160,7 +166,7 @@ export function ReleasesView({
       ) : (
         <>
           <div className="space-y-4">
-            {upcoming.map((r) => (
+            {active.map((r) => (
               <ReleaseCard
                 key={r.id}
                 release={r}
@@ -169,7 +175,7 @@ export function ReleasesView({
                 siblings={siblings}
               />
             ))}
-            {upcoming.length === 0 && (
+            {active.length === 0 && (
               <p className="text-sm text-ink-soft">
                 Nothing upcoming. Add your next release to start the countdown.
               </p>
@@ -292,7 +298,9 @@ function ReleaseCard({
 }) {
   const [open, setOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const diff = dayDiff(today, release.release_date);
+  const diff = release.release_date
+    ? dayDiff(today, release.release_date)
+    : null;
 
   const pre = release.tasks.filter((t) => t.offset_days < 0);
   const preDone = pre.filter((t) => t.is_completed).length;
@@ -312,7 +320,7 @@ function ReleaseCard({
             {TYPE_LABEL[release.release_type]}
           </span>
           <span className="text-xs text-ink-soft">
-            {fmtDate(release.release_date)}
+            {release.release_date ? fmtDate(release.release_date) : "Date TBD"}
           </span>
         </div>
         <p className="mt-2 font-serif text-2xl leading-snug text-ink">
@@ -329,7 +337,7 @@ function ReleaseCard({
           <ProductionBar state={production ?? EMPTY_PRODUCTION} />
         )}
         <p className="mt-4 text-sm font-medium text-accent-gold">
-          {countdown(diff)}
+          {diff === null ? "Date not set — open to schedule" : countdown(diff)}
         </p>
         {pre.length > 0 && <ProgressBar done={preDone} total={pre.length} />}
         <span className="mt-3 flex items-center gap-1 text-xs text-ink-soft">
@@ -437,31 +445,32 @@ function ReleaseDetail({
   const [addingPhase, setAddingPhase] = useState<number | null>(null);
   const [taskDraft, setTaskDraft] = useState("");
   const [editingDate, setEditingDate] = useState(false);
-  const [dateDraft, setDateDraft] = useState(release.release_date);
+  const [dateDraft, setDateDraft] = useState(release.release_date ?? "");
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(release.title);
   const [notesDraft, setNotesDraft] = useState(release.notes ?? "");
   const [mgmtDraft, setMgmtDraft] = useState(release.mgmt_link ?? "");
   const [addingSingle, setAddingSingle] = useState(false);
   const [singleTitle, setSingleTitle] = useState("");
-  // Default a linked single to ~6 weeks before the project (lead-single timing).
+  // Default a linked single to ~6 weeks before the project (lead-single timing);
+  // blank if the project itself has no date yet.
   const [singleDate, setSingleDate] = useState(
-    shiftDate(release.release_date, -42),
+    release.release_date ? shiftDate(release.release_date, -42) : "",
   );
 
   const linkedSingles = siblings
     .filter((s) => s.parent_release_id === release.id)
-    .sort((a, b) => a.release_date.localeCompare(b.release_date));
+    .sort((a, b) => (a.release_date ?? "").localeCompare(b.release_date ?? ""));
 
   function addSingle() {
     const title = singleTitle.trim();
-    if (!title || !singleDate) return;
+    if (!title) return;
     setSingleTitle("");
     setAddingSingle(false);
     run(async () => {
       await addRelease({
         title,
-        releaseDate: singleDate,
+        releaseDate: singleDate || undefined,
         releaseType: "single",
         parentReleaseId: release.id,
       });
@@ -684,7 +693,7 @@ function ReleaseDetail({
                 >
                   <span className="text-sm text-ink">{s.title}</span>
                   <span className="text-xs text-ink-soft">
-                    {fmtDate(s.release_date)}
+                    {s.release_date ? fmtDate(s.release_date) : "Date TBD"}
                   </span>
                 </li>
               ))}
@@ -727,7 +736,11 @@ function ReleaseDetail({
           ) : (
             <button
               onClick={() => {
-                setSingleDate(shiftDate(release.release_date, -42));
+                setSingleDate(
+                  release.release_date
+                    ? shiftDate(release.release_date, -42)
+                    : "",
+                );
                 setAddingSingle(true);
               }}
               className="mt-3 inline-flex items-center gap-1.5 text-sm text-ink-soft transition-colors hover:text-ink"
@@ -743,7 +756,9 @@ function ReleaseDetail({
         {editingDate ? (
           <div className="flex w-full flex-col gap-2 rounded-xl border border-line bg-surface-primary p-3">
             <p className="text-sm text-ink">
-              Move the release date — every task shifts to match.
+              {release.release_date
+                ? "Move the release date — every task shifts to match."
+                : "Set the release date — the whole schedule fills in from it."}
             </p>
             <input
               type="date"
@@ -754,7 +769,7 @@ function ReleaseDetail({
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => {
-                  setDateDraft(release.release_date);
+                  setDateDraft(release.release_date ?? "");
                   setEditingDate(false);
                 }}
                 className="rounded-lg px-3 py-1.5 text-sm text-ink-soft"
@@ -769,7 +784,7 @@ function ReleaseDetail({
                 }}
                 className="rounded-lg bg-ink px-3 py-1.5 text-sm text-surface-primary"
               >
-                Shift dates
+                {release.release_date ? "Shift dates" : "Set date"}
               </button>
             </div>
           </div>
@@ -778,7 +793,7 @@ function ReleaseDetail({
             onClick={() => setEditingDate(true)}
             className="text-sm text-ink-soft transition-colors hover:text-ink"
           >
-            Change date
+            {release.release_date ? "Change date" : "Set release date"}
           </button>
         )}
       </div>
@@ -1029,14 +1044,14 @@ function AddReleaseModal({
   const [notes, setNotes] = useState("");
   const [mgmtCode, setMgmtCode] = useState("");
 
-  const canSubmit = title.trim() && date;
+  const canSubmit = !!title.trim();
 
   function submit() {
     if (!canSubmit) return;
     startTransition(async () => {
       await addRelease({
         title: title.trim(),
-        releaseDate: date,
+        releaseDate: date || undefined,
         releaseType: type,
         notes: notes.trim() || undefined,
         // Only singles track production; don't attach a code to a project.
@@ -1083,7 +1098,7 @@ function AddReleaseModal({
 
           <div>
             <label className="text-xs uppercase tracking-wide text-ink-soft">
-              Release date
+              Release date <span className="normal-case">(optional)</span>
             </label>
             <input
               type="date"
@@ -1092,6 +1107,10 @@ function AddReleaseModal({
               onChange={(e) => setDate(e.target.value)}
               className="mt-1.5 w-full rounded-xl border border-line bg-surface-secondary px-3 py-2.5 text-ink outline-none focus:border-ink"
             />
+            <p className="mt-1.5 text-xs text-ink-soft">
+              No date yet? Leave it blank — add it later and the whole schedule
+              fills in.
+            </p>
           </div>
 
           <div>

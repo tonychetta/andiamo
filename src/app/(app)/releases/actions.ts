@@ -28,14 +28,15 @@ function addDays(dateStr: string, days: number): string {
 // Create a release and expand the matching strategy template into dated tasks.
 export async function addRelease(input: {
   title: string;
-  releaseDate: string; // YYYY-MM-DD
+  releaseDate?: string; // YYYY-MM-DD — optional; can be added later
   releaseType: "single" | "project";
   notes?: string;
   mgmtLink?: string; // MGMT song code or link (optional)
   parentReleaseId?: string; // set when this single is linked to a project
 }): Promise<string | undefined> {
   const title = input.title.trim();
-  if (!title || !input.releaseDate) return;
+  if (!title) return;
+  const releaseDate = input.releaseDate || null;
   const { supabase, artistId: aid } = await artistId();
   if (!aid) return;
 
@@ -45,7 +46,7 @@ export async function addRelease(input: {
       artist_id: aid,
       title,
       release_type: input.releaseType,
-      release_date: input.releaseDate,
+      release_date: releaseDate,
       notes: input.notes?.trim() || null,
       mgmt_link: input.mgmtLink?.trim() || null,
       parent_release_id: input.parentReleaseId ?? null,
@@ -61,7 +62,7 @@ export async function addRelease(input: {
       artist_id: aid,
       title,
       release_id: release.id,
-      original_release_date: input.releaseDate,
+      original_release_date: releaseDate,
     });
   }
 
@@ -87,7 +88,7 @@ export async function addRelease(input: {
     phase_label: string;
     week_title: string;
     offset_days: number;
-    due_date: string;
+    due_date: string | null;
     display_order: number;
   }[] = [];
   let order = 0;
@@ -102,7 +103,8 @@ export async function addRelease(input: {
         phase_label: phase.label,
         week_title: phase.title ?? "",
         offset_days: phase.offsetDays,
-        due_date: addDays(input.releaseDate, phase.offsetDays),
+        // No date yet → null due date; set later via changeReleaseDate.
+        due_date: releaseDate ? addDays(releaseDate, phase.offsetDays) : null,
         display_order: order++,
       });
     }
@@ -230,7 +232,9 @@ export async function addReleaseTask(
     phase_label: phaseLabel,
     week_title: weekTitle,
     offset_days: offsetDays,
-    due_date: addDays(release.release_date, offsetDays),
+    due_date: release.release_date
+      ? addDays(release.release_date, offsetDays)
+      : null,
     is_custom: true,
     // High order so a custom task appends to the END of its phase group.
     display_order: 100000,
@@ -287,7 +291,7 @@ export async function addLaunchTasks(
       description: d,
       phase_label: "Release Week",
       offset_days: i, // Day 1 = release day, Day 2 = +1, …
-      due_date: addDays(release.release_date, i),
+      due_date: release.release_date ? addDays(release.release_date, i) : null,
       is_custom: true,
       display_order: 200000 + i,
     }));

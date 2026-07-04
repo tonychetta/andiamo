@@ -57,11 +57,13 @@ export default async function ContentPage() {
   return (
     <ContentView
       today={today}
-      releaseDates={(releases ?? []).map((r) => ({
-        id: r.id,
-        title: r.title,
-        date: r.release_date,
-      }))}
+      releaseDates={(releases ?? [])
+        .filter((r) => r.release_date)
+        .map((r) => ({
+          id: r.id,
+          title: r.title,
+          date: r.release_date as string,
+        }))}
       songs={songs ?? []}
       contentTypes={contentTypes ?? []}
       pieces={piecesData}
