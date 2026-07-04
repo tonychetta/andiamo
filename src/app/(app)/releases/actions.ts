@@ -83,7 +83,9 @@ export async function addRelease(input: {
     artist_id: string;
     release_id: string;
     description: string;
+    phase_group: string;
     phase_label: string;
+    week_title: string;
     offset_days: number;
     due_date: string;
     display_order: number;
@@ -96,7 +98,9 @@ export async function addRelease(input: {
         artist_id: aid,
         release_id: release.id,
         description: description.trim(),
+        phase_group: phase.group ?? "",
         phase_label: phase.label,
+        week_title: phase.title ?? "",
         offset_days: phase.offsetDays,
         due_date: addDays(input.releaseDate, phase.offsetDays),
         display_order: order++,
@@ -205,6 +209,8 @@ export async function addReleaseTask(
   description: string,
   phaseLabel: string,
   offsetDays: number,
+  phaseGroup = "",
+  weekTitle = "",
 ) {
   const text = description.trim();
   if (!text) return;
@@ -220,7 +226,9 @@ export async function addReleaseTask(
     artist_id: aid,
     release_id: releaseId,
     description: text,
+    phase_group: phaseGroup,
     phase_label: phaseLabel,
+    week_title: weekTitle,
     offset_days: offsetDays,
     due_date: addDays(release.release_date, offsetDays),
     is_custom: true,
@@ -310,7 +318,9 @@ export async function saveTemplate(
   const { supabase, artistId: aid } = await artistId();
   if (!aid) return;
   const clean: EditablePhase[] = phases.map((p) => ({
+    group: p.group,
     label: p.label,
+    title: p.title,
     offsetDays: p.offsetDays,
     tasks: p.tasks.map((t) => t.trim()).filter(Boolean),
   }));

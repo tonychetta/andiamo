@@ -1,11 +1,46 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, X } from "@phosphor-icons/react";
 import { saveTemplate, resetTemplate } from "@/app/(app)/releases/actions";
 
-type Phase = { label: string; offsetDays: number; tasks: string[] };
+type Phase = {
+  group?: string;
+  label: string;
+  title?: string;
+  offsetDays: number;
+  tasks: string[];
+};
+
+// A textarea that grows to fit its content, so long tasks are fully visible
+// without scrolling inside the box.
+function AutoTextarea({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  function resize() {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }
+  useEffect(resize, [value]);
+  return (
+    <textarea
+      ref={ref}
+      value={value}
+      rows={1}
+      onChange={(e) => onChange(e.target.value)}
+      onInput={resize}
+      className="flex-1 resize-none overflow-hidden rounded-lg border border-line bg-surface-secondary px-2.5 py-1.5 text-sm leading-snug text-ink outline-none focus:border-ink"
+    />
+  );
+}
 type TemplateType = "single" | "project";
 
 export type TemplatesProp = {
@@ -111,24 +146,33 @@ export function TemplateEditor({
         </div>
 
         {/* Scrollable phases */}
-        <div className="mt-4 flex-1 space-y-5 overflow-y-auto px-6 pb-4">
+        <div className="mt-4 flex-1 space-y-6 overflow-y-auto px-6 pb-4">
           {phases.map((phase, pi) => (
             <div key={`${phase.label}-${pi}`}>
-              <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-ink">
+              {/* Phase separator — once, above the first week of each phase */}
+              {phase.group && phase.group !== phases[pi - 1]?.group && (
+                <p className="mb-3 border-b border-line pb-1.5 font-serif text-lg text-accent-gold">
+                  {phase.group}
+                </p>
+              )}
+              {phase.title && (
+                <h3 className="font-serif text-lg leading-tight text-ink">
+                  {phase.title}
+                </h3>
+              )}
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-soft">
                 {phase.label}
-              </h3>
+              </p>
               <div className="mt-2 space-y-2">
                 {phase.tasks.map((task, ti) => (
                   <div key={ti} className="flex items-start gap-2">
-                    <textarea
+                    <AutoTextarea
                       value={task}
-                      onChange={(e) =>
+                      onChange={(v) =>
                         editPhase(pi, (tasks) =>
-                          tasks.map((t, j) => (j === ti ? e.target.value : t)),
+                          tasks.map((t, j) => (j === ti ? v : t)),
                         )
                       }
-                      rows={2}
-                      className="flex-1 resize-none rounded-lg border border-line bg-surface-secondary px-2.5 py-1.5 text-sm leading-snug text-ink outline-none focus:border-ink"
                     />
                     <button
                       onClick={() =>

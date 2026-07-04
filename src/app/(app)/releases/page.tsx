@@ -23,7 +23,7 @@ export default async function ReleasesPage() {
     supabase
       .from("release_tasks")
       .select(
-        "id, release_id, description, assigned_to, phase_label, offset_days, due_date, is_completed, is_custom, display_order",
+        "id, release_id, description, assigned_to, phase_group, phase_label, week_title, offset_days, due_date, is_completed, is_custom, display_order",
       )
       .order("offset_days", { ascending: true })
       .order("display_order", { ascending: true }),

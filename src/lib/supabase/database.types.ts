@@ -605,9 +605,11 @@ export type Database = {
           is_completed: boolean
           is_custom: boolean
           offset_days: number
+          phase_group: string
           phase_label: string
           release_id: string
           updated_at: string
+          week_title: string
         }
         Insert: {
           artist_id: string
@@ -621,9 +623,11 @@ export type Database = {
           is_completed?: boolean
           is_custom?: boolean
           offset_days?: number
+          phase_group?: string
           phase_label?: string
           release_id: string
           updated_at?: string
+          week_title?: string
         }
         Update: {
           artist_id?: string
@@ -637,9 +641,11 @@ export type Database = {
           is_completed?: boolean
           is_custom?: boolean
           offset_days?: number
+          phase_group?: string
           phase_label?: string
           release_id?: string
           updated_at?: string
+          week_title?: string
         }
         Relationships: [
           {

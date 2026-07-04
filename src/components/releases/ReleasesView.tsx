@@ -32,7 +32,9 @@ type Task = {
   release_id: string;
   description: string;
   assigned_to: Assignee;
+  phase_group: string;
   phase_label: string;
+  week_title: string;
   offset_days: number;
   due_date: string | null;
   is_completed: boolean;
@@ -473,9 +475,11 @@ function ReleaseDetail({
     });
   }
 
-  // Group tasks into their phases, preserving the template's chronological order.
+  // Group tasks into their weeks, preserving the template's chronological order.
   const phases: {
+    group: string;
     label: string;
+    title: string;
     date: string | null;
     offsetDays: number;
     tasks: Task[];
@@ -485,18 +489,28 @@ function ReleaseDetail({
     if (last && last.label === t.phase_label) last.tasks.push(t);
     else
       phases.push({
+        group: t.phase_group,
         label: t.phase_label,
+        title: t.week_title,
         date: t.due_date,
         offsetDays: t.offset_days,
         tasks: [t],
       });
   }
 
-  function submitPhaseTask(label: string, offsetDays: number) {
+  function submitPhaseTask(
+    label: string,
+    offsetDays: number,
+    group: string,
+    title: string,
+  ) {
     const text = taskDraft.trim();
     setTaskDraft("");
     setAddingPhase(null);
-    if (text) run(() => addReleaseTask(release.id, text, label, offsetDays));
+    if (text)
+      run(() =>
+        addReleaseTask(release.id, text, label, offsetDays, group, title),
+      );
   }
 
   return (
@@ -577,14 +591,29 @@ function ReleaseDetail({
       )}
 
       {/* Phase-by-phase schedule */}
-      <div className="space-y-5">
+      <div className="space-y-6">
         {phases.map((phase, i) => (
           <div key={`${phase.label}-${i}`}>
-            <div className="flex items-baseline justify-between">
-              <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-ink">
-                {phase.label}
-              </h3>
-              <span className="text-xs text-ink-soft">{fmtDate(phase.date)}</span>
+            {/* Phase separator — shown once, above the first week of each phase */}
+            {phase.group && phase.group !== phases[i - 1]?.group && (
+              <p className="mb-3 border-b border-line pb-1.5 font-serif text-lg text-accent-gold">
+                {phase.group}
+              </p>
+            )}
+            <div className="flex items-baseline justify-between gap-3">
+              <div>
+                {phase.title && (
+                  <h3 className="font-serif text-lg leading-tight text-ink">
+                    {phase.title}
+                  </h3>
+                )}
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-soft">
+                  {phase.label}
+                </p>
+              </div>
+              <span className="shrink-0 text-xs text-ink-soft">
+                {fmtDate(phase.date)}
+              </span>
             </div>
             <div className="mt-2 space-y-0.5">
               {phase.tasks.map((t) => (
@@ -598,13 +627,25 @@ function ReleaseDetail({
                 onChange={(e) => setTaskDraft(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter")
-                    submitPhaseTask(phase.label, phase.offsetDays);
+                    submitPhaseTask(
+                      phase.label,
+                      phase.offsetDays,
+                      phase.group,
+                      phase.title,
+                    );
                   if (e.key === "Escape") {
                     setTaskDraft("");
                     setAddingPhase(null);
                   }
                 }}
-                onBlur={() => submitPhaseTask(phase.label, phase.offsetDays)}
+                onBlur={() =>
+                  submitPhaseTask(
+                    phase.label,
+                    phase.offsetDays,
+                    phase.group,
+                    phase.title,
+                  )
+                }
                 placeholder={`Add a task to ${phase.label}…`}
                 className="mt-2 w-full rounded-lg border border-line bg-surface-primary px-2.5 py-1.5 text-sm text-ink outline-none focus:border-ink"
               />

@@ -12,197 +12,205 @@ export type TemplateTask = {
 };
 
 export type TemplatePhase = {
+  // The named Phase this week belongs to (a visual separator across weeks).
+  group?: string;
+  // The week's timing, e.g. "12 Weeks Out".
   label: string;
+  // The week's title (the "A." heading), e.g. "Brand Definition & Resource Gathering".
+  title?: string;
   offsetDays: number;
   tasks: TemplateTask[];
 };
 
-const t = (description: string, assignee: ReleaseAssignee): TemplateTask => ({
+// Assignment is a separate manual/DWY step, so assignee defaults to "both".
+const t = (description: string, assignee: ReleaseAssignee = "both"): TemplateTask => ({
   description,
   assignee,
 });
 
+// Phase names — reused across the weeks that belong to each phase.
+const P1 = "PHASE 1 → Branding & Resources";
+const P2 = "PHASE 2 → Production, Pitching, & Planning";
+const P3 = "PHASE 3 → Whisper, Tease, Shout";
+const P4 = "PHASE 4 → Bombard & Learn";
+
 // ---------- Single Release Strategy Template (12 weeks) ----------
 export const SINGLE_TEMPLATE: TemplatePhase[] = [
   {
+    group: P1,
     label: "12 Weeks Out",
+    title: "Brand Definition & Resource Gathering",
     offsetDays: -84,
     tasks: [
       t(
         "Define the song's marketing angle — the one sentence about this song that becomes the hook of every pitch, caption, and outreach",
-        "both",
       ),
-      t(
-        "Build target press list of 30–50 names with personalized pitch angle",
-        "both",
-      ),
+      t("Build target press list of 30–50 names with personalized pitch angle"),
       t(
         "Build target playlist list — both editorial (Spotify/Apple) and independent curators",
-        "both",
       ),
-      t(
-        "Identify potential sync opportunities; brief publisher if applicable",
-        "producer",
-      ),
-      t("Submit PRO registration", "producer"),
+      t("Identify potential sync opportunities; brief publisher if applicable"),
+      t("Submit PRO registration"),
     ],
   },
   {
+    group: P1,
     label: "10 Weeks Out",
+    title: "Content Vault",
     offsetDays: -70,
     tasks: [
-      t("Finalize artwork direction; brief designer/photographer", "artist"),
+      t("Finalize artwork direction; brief designer/photographer"),
       t(
         "Begin assembling content vault — behind-the-scenes footage, voice memos, live clips, anything cuttable into pre-release content",
-        "artist",
       ),
+      t("Assemble the visual world"),
     ],
   },
   {
+    group: P2,
     label: "8 Weeks Out",
+    title: "Production Halfway Done and Photos",
     offsetDays: -56,
     tasks: [
-      t("Finish PROD and EDT phases", "producer"),
-      t("Final artwork approved", "artist"),
-      t("Photo shoot for press assets if needed", "artist"),
-      t("Begin soft teasing the song on socials", "artist"),
+      t("Finish PROD and EDT phases"),
+      t("Final artwork approved"),
+      t("Photo shoot for press assets and/or your own posts"),
     ],
   },
   {
+    group: P2,
     label: "7 Weeks Out",
+    title: "Finish Entire Song",
     offsetDays: -49,
-    tasks: [t("Finish MIX and MST phases", "producer")],
+    tasks: [t("Finish MIX and MST phases")],
   },
   {
+    group: P2,
     label: "6 Weeks Out",
+    title: "Set the Release in Motion",
     offsetDays: -42,
     tasks: [
-      t("Upload to distribution", "producer"),
-      t("Submit Spotify editorial pitch via S4A", "both"),
-      t("Submit Apple Music editorial pitch via AM4A", "both"),
-      t("Submit YouTube Music editorial pitch if applicable", "both"),
-      t("Confirm pre-save link is live", "producer"),
+      t("Upload to distribution"),
+      t("Submit Spotify editorial pitch via S4A"),
+      t("Submit Apple Music editorial pitch via AM4A"),
+      t("Submit YouTube Music editorial pitch if applicable"),
+      t("Confirm pre-save link is live"),
     ],
   },
   {
+    group: P2,
     label: "5 Weeks Out",
+    title: "Pitching and Release Week Visualizer Planning",
     offsetDays: -35,
     tasks: [
       t(
         "Begin press outreach — first wave of personalized pitches to target press list",
-        "both",
       ),
-      t("Begin direct playlist pitching to independent curators", "both"),
-      t("Begin sync pitching if applicable", "producer"),
-      t("Plan the visual companion — music video, visualizer, or lyric video", "both"),
+      t("Begin direct playlist pitching to independent curators"),
+      t("Begin sync pitching if applicable"),
+      t("Plan the visual companion — music video, visualizer, or lyric video"),
     ],
   },
   {
+    group: P3,
     label: "4 Weeks Out",
+    title: "Content Cadence Begins / Marketing Planning",
     offsetDays: -28,
     tasks: [
+      t("Schedule release-week content in the Content calendar"),
       t(
-        "Run small SubmitHub or Groover diagnostic campaign ($40–60) to test save rate",
-        "both",
-      ),
-      t("Schedule release-week content in the Content calendar", "both"),
-      t(
-        "First teaser content drops — short clips, snippet posts, lyric reveals",
-        "artist",
+        "First Whisper content drops — short clips, snippet posts, lyric reveals",
       ),
       t(
         "Schedule any release-week press appearances (podcasts, radio, interviews, livestreams)",
-        "both",
       ),
-      t("Build the email/SMS list announcement", "artist"),
+      t("Build the email/SMS list announcement"),
     ],
   },
   {
+    group: P3,
     label: "3 Weeks Out",
+    title: "Whisper",
     offsetDays: -21,
     tasks: [
-      t("Content cadence is active — see Content calendar", "artist"),
-      t("Pre-save link goes wide across all channels", "artist"),
-      t(
-        "Coordinate with featured artists and collaborators — confirm they're pre-saving and promoting",
-        "artist",
-      ),
+      t("Continue Whisper content"),
+      t("Drop pre-save link on all channels"),
     ],
   },
   {
+    group: P3,
     label: "2 Weeks Out",
+    title: "Tease",
     offsetDays: -14,
     tasks: [
-      t("Lyric submission to Genius and MusixMatch", "producer"),
-      t("YouTube Content ID confirmed via distributor", "producer"),
+      t("Lyric submission to Genius and MusixMatch"),
+      t("YouTube Content ID confirmed via distributor"),
       t(
-        "Final content review — release-week and release-day content locked, shot, and queued",
-        "both",
+        "New content → new song sections, new content types. Test and measure.",
       ),
     ],
   },
   {
+    group: P3,
     label: "1 Week Out",
+    title: "Shout",
     offsetDays: -7,
     tasks: [
-      t("Final pre-release content push — daily posting all week", "artist"),
-      t("Email and SMS blast to owned list with pre-save link", "artist"),
+      t("Daily posting all week on all channels"),
+      t("Email and SMS blast to owned list with pre-save link"),
       t(
         "Confirm all platforms show the song correctly — title spelling, credits, artwork, ISRC",
-        "producer",
       ),
       t(
         "Personal outreach to top 50–100 fans, friends, and industry contacts asking them to save, share, and listen on release day",
-        "artist",
       ),
-      t("Plan release day — see Release Day Template", "both"),
+      t("Plan release day — see Release Day Template"),
     ],
   },
   {
-    label: "Release Day",
+    group: P4,
+    label: "Week Of Release",
+    title: "Bombard",
     offsetDays: 0,
-    tasks: [t("See Release Day Template", "both")],
-  },
-  {
-    label: "Week 1 After Release",
-    offsetDays: 7,
     tasks: [
-      t("Engage every comment, repost, and DM — daily", "artist"),
-      t("Pull first-week stream data across platforms", "producer"),
-      t("Pull save rate — the most important early signal", "producer"),
-      t("Pull playlist add data — which playlists added, which didn't", "producer"),
+      t("Days 1–3, heavy meta ads on successful content"),
+      t("Days 4–7, lighter meta ads"),
+      t("Engage every comment, repost, and DM — daily"),
+      t("Pull first-week stream data across platforms"),
+      t("Pull save rate — the most important early signal"),
+      t("Pull playlist add data — which playlists added, which didn't"),
       t(
-        "Note who supported and who didn't, for the next release's outreach list",
-        "both",
+        "Note press who supported and who didn't, for the next release's outreach list",
       ),
       t(
         "Post-release content wave — reactions, behind-the-scenes, live versions, breakdowns",
-        "artist",
       ),
+      t("Release the visual companion"),
     ],
   },
   {
-    label: "Weeks 2–3 After Release",
+    group: P4,
+    label: "2–3 Weeks Post-Release",
+    title: "Reiterate",
     offsetDays: 14,
     tasks: [
-      t("Refresh content cadence based on what's working", "artist"),
+      t("Refresh content cadence based on what's working"),
       t(
         "Second wave of press outreach with fresh angle (stream milestone, fan reactions)",
-        "both",
       ),
     ],
   },
   {
-    label: "Week 4 After Release",
+    group: P4,
+    label: "4 Weeks Post-Release",
+    title: "Reflect",
     offsetDays: 28,
     tasks: [
       t(
         "Post-release retrospective — what worked, what didn't, catalog impact, did the song hit its goals?",
-        "both",
       ),
       t(
         "Catalog playlist pitching — pitch the song to mood/vibe/genre playlists now that the editorial window has closed",
-        "both",
       ),
     ],
   },
@@ -448,7 +456,9 @@ export function templateFor(type: "single" | "project"): TemplatePhase[] {
 // The shape we edit + persist per artist. Tasks are plain strings (assignment is
 // a separate manual/DWY step, not part of the template).
 export type EditablePhase = {
+  group?: string;
   label: string;
+  title?: string;
   offsetDays: number;
   tasks: string[];
 };
@@ -458,7 +468,9 @@ export function defaultEditableTemplate(
   type: "single" | "project",
 ): EditablePhase[] {
   return templateFor(type).map((phase) => ({
+    group: phase.group,
     label: phase.label,
+    title: phase.title,
     offsetDays: phase.offsetDays,
     tasks: phase.tasks.map((t) => t.description),
   }));
