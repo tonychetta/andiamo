@@ -39,7 +39,10 @@ import {
   reorderMilestones,
   addSuggestedTasks,
   setTaskOnWtf,
+  completeMilestone,
+  type MilestoneRecap as RecapData,
 } from "@/app/(app)/roadmap/actions";
+import { MilestoneRecap } from "./MilestoneRecap";
 
 type TaskStatus = "pending" | "completed" | "pushed" | "complete_and_push";
 type Task = {
@@ -219,6 +222,7 @@ function MilestoneStack({ goal }: { goal: Goal }) {
   const [spread, setSpread] = useState(0.35);
   const [dragging, setDragging] = useState(false);
   const [reordering, setReordering] = useState(false);
+  const [recap, setRecap] = useState<RecapData | null>(null);
   // `order` is the working list of FUTURE milestones, furthest-first
   // (top-to-bottom). The Next milestone is always #1 and lives below them.
   const [order, setOrder] = useState<Milestone[]>(
@@ -285,6 +289,14 @@ function MilestoneStack({ goal }: { goal: Goal }) {
       await reorderMilestones(goal.id, nearestFirst);
       router.refresh();
     });
+  }
+
+  // Mark the Next milestone achieved → launch the Wrapped-style recap, then
+  // refresh so the completed card drops and the following milestone steps up.
+  async function complete(id: string) {
+    const r = await completeMilestone(id);
+    if (r) setRecap(r);
+    router.refresh();
   }
 
   // Promote a future milestone straight to Next (number 1).
@@ -364,8 +376,12 @@ function MilestoneStack({ goal }: { goal: Goal }) {
           transition: "margin-top 0.5s cubic-bezier(0.22, 1, 0.36, 1)",
         }}
       >
-        <NextCardContent milestone={next} />
+        <NextCardContent milestone={next} onComplete={complete} />
       </div>
+
+      {recap && (
+        <MilestoneRecap recap={recap} onClose={() => setRecap(null)} />
+      )}
 
       <AddNextMilestone
         onAdd={(text) =>
@@ -583,13 +599,32 @@ function FutureCard({
   );
 }
 
-function NextCardContent({ milestone }: { milestone: Milestone }) {
+function NextCardContent({
+  milestone,
+  onComplete,
+}: {
+  milestone: Milestone;
+  onComplete: (id: string) => void;
+}) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [editing, setEditing] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const lastTap = useRef(0);
   const [draft, setDraft] = useState(milestone.description);
   const [addingTask, setAddingTask] = useState(false);
   const [newTask, setNewTask] = useState("");
+
+  // Double-tap the title to mark this milestone achieved.
+  function onTitleTap() {
+    const now = Date.now();
+    if (now - lastTap.current < 320) {
+      lastTap.current = 0;
+      setConfirming(true);
+    } else {
+      lastTap.current = now;
+    }
+  }
   const [suggesting, setSuggesting] = useState(false);
   const [suggestions, setSuggestions] = useState<
     { description: string; reason: string; selected: boolean }[] | null
@@ -691,7 +726,11 @@ function NextCardContent({ milestone }: { milestone: Milestone }) {
         </div>
       ) : (
         <div className="mt-1 flex items-start justify-between gap-3">
-          <p className="font-serif text-xl leading-snug text-ink">
+          <p
+            onClick={onTitleTap}
+            title="Double-tap to mark achieved"
+            className="cursor-pointer select-none font-serif text-xl leading-snug text-ink"
+          >
             {milestone.description}
           </p>
           <div className="mt-1">
@@ -704,6 +743,42 @@ function NextCardContent({ milestone }: { milestone: Milestone }) {
                 })
               }
             />
+          </div>
+        </div>
+      )}
+
+      {confirming && (
+        <div
+          onClick={() => setConfirming(false)}
+          className="fade-in fixed inset-0 z-[80] flex items-center justify-center bg-ink/40 px-6"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-xs rounded-2xl bg-surface-primary p-6 text-center shadow-2xl"
+          >
+            <p className="text-xs uppercase tracking-[0.18em] text-accent-gold">
+              Milestone Achieved?
+            </p>
+            <p className="mt-2 font-serif text-lg leading-snug text-ink">
+              {milestone.description}
+            </p>
+            <div className="mt-5 flex gap-2">
+              <button
+                onClick={() => setConfirming(false)}
+                className="flex-1 rounded-xl border border-line py-2.5 text-sm text-ink"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setConfirming(false);
+                  onComplete(milestone.id);
+                }}
+                className="flex-1 rounded-xl bg-ink py-2.5 text-sm font-medium text-surface-primary"
+              >
+                Complete
+              </button>
+            </div>
           </div>
         </div>
       )}

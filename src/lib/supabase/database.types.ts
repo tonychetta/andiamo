@@ -432,6 +432,30 @@ export type Database = {
           },
         ]
       }
+      deleted_tasks: {
+        Row: {
+          artist_id: string
+          deleted_at: string
+          description: string
+          id: string
+          milestone_id: string | null
+        }
+        Insert: {
+          artist_id: string
+          deleted_at?: string
+          description: string
+          id?: string
+          milestone_id?: string | null
+        }
+        Update: {
+          artist_id?: string
+          deleted_at?: string
+          description?: string
+          id?: string
+          milestone_id?: string | null
+        }
+        Relationships: []
+      }
       milestones: {
         Row: {
           artist_id: string
@@ -810,6 +834,7 @@ export type Database = {
           assigned_coach_id: string | null
           assigned_to: Database["public"]["Enums"]["task_assignee"]
           completed_at: string | null
+          cp_count: number
           created_at: string
           description: string
           display_order: number
@@ -819,6 +844,7 @@ export type Database = {
           milestone_id: string | null
           on_wtf: boolean
           parent_task_id: string | null
+          push_count: number
           push_reason: string | null
           status: Database["public"]["Enums"]["task_status"]
           updated_at: string
@@ -829,6 +855,7 @@ export type Database = {
           assigned_coach_id?: string | null
           assigned_to?: Database["public"]["Enums"]["task_assignee"]
           completed_at?: string | null
+          cp_count?: number
           created_at?: string
           description?: string
           display_order?: number
@@ -838,6 +865,7 @@ export type Database = {
           milestone_id?: string | null
           on_wtf?: boolean
           parent_task_id?: string | null
+          push_count?: number
           push_reason?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           updated_at?: string
@@ -848,6 +876,7 @@ export type Database = {
           assigned_coach_id?: string | null
           assigned_to?: Database["public"]["Enums"]["task_assignee"]
           completed_at?: string | null
+          cp_count?: number
           created_at?: string
           description?: string
           display_order?: number
@@ -857,6 +886,7 @@ export type Database = {
           milestone_id?: string | null
           on_wtf?: boolean
           parent_task_id?: string | null
+          push_count?: number
           push_reason?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           updated_at?: string

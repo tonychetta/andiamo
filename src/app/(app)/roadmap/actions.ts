@@ -81,7 +81,22 @@ export async function toggleTask(taskId: string, completed: boolean) {
 }
 
 export async function deleteTask(taskId: string) {
-  const supabase = await createClient();
+  const { supabase, artistId: aid } = await artistId();
+  if (!aid) return;
+  // Log milestone tasks before deleting so the Recap can show what "wasn't
+  // useful" for that milestone. (Orphan tasks with no milestone aren't logged.)
+  const { data: task } = await supabase
+    .from("tasks")
+    .select("milestone_id, description")
+    .eq("id", taskId)
+    .single();
+  if (task?.milestone_id) {
+    await supabase.from("deleted_tasks").insert({
+      artist_id: aid,
+      milestone_id: task.milestone_id,
+      description: task.description,
+    });
+  }
   const { error } = await supabase.from("tasks").delete().eq("id", taskId);
   if (error) throw new Error(error.message);
   revalidatePath("/roadmap");
@@ -93,17 +108,29 @@ export async function setTaskStatus(
 ) {
   const supabase = await createClient();
   const done = status === "completed" || status === "complete_and_push";
+  // Read current history counters so we can bump them (drives the Recap buckets).
+  const { data: cur } = await supabase
+    .from("tasks")
+    .select("push_count, cp_count")
+    .eq("id", taskId)
+    .single();
   const update: {
     status: typeof status;
     is_completed: boolean;
     completed_at: string | null;
     is_recurring?: boolean;
+    push_count?: number;
+    cp_count?: number;
   } = {
     status,
     is_completed: done,
     completed_at: done ? new Date().toISOString() : null,
   };
-  if (status === "complete_and_push") update.is_recurring = true;
+  if (status === "pushed") update.push_count = (cur?.push_count ?? 0) + 1;
+  if (status === "complete_and_push") {
+    update.is_recurring = true;
+    update.cp_count = (cur?.cp_count ?? 0) + 1;
+  }
   const { error } = await supabase.from("tasks").update(update).eq("id", taskId);
   if (error) throw new Error(error.message);
   revalidatePath("/roadmap");
@@ -194,6 +221,122 @@ export async function updateMilestone(milestoneId: string, description: string) 
     .eq("id", milestoneId);
   if (error) throw new Error(error.message);
   revalidatePath("/roadmap");
+}
+
+// ---------- Milestone Recap ----------
+
+export type RecapConsistency = { description: string; count: number };
+export type MilestoneRecap = {
+  milestoneId: string;
+  title: string;
+  startedAt: string | null;
+  completedAt: string;
+  days: number | null;
+  taskCount: number;
+  easyWins: string[]; // completed first try (no pushes)
+  notUseful: string[]; // deleted
+  difficulties: string[]; // pushed at least once, then completed
+  consistency: RecapConsistency[]; // completed-and-pushed (recurring cadence)
+  next: { id: string; description: string } | null;
+};
+
+// Mark a milestone achieved, sort its task history into the Recap buckets, and
+// hand the "Next" flag to the nearest remaining milestone in the goal.
+export async function completeMilestone(
+  milestoneId: string,
+): Promise<MilestoneRecap | null> {
+  const { supabase, artistId: aid } = await artistId();
+  if (!aid) return null;
+
+  const { data: m } = await supabase
+    .from("milestones")
+    .select("id, description, goal_id, started_at")
+    .eq("id", milestoneId)
+    .single();
+  if (!m) return null;
+
+  const [{ data: tasks }, { data: deleted }] = await Promise.all([
+    supabase
+      .from("tasks")
+      .select("description, is_completed, push_count, cp_count")
+      .eq("milestone_id", milestoneId),
+    supabase
+      .from("deleted_tasks")
+      .select("description")
+      .eq("milestone_id", milestoneId)
+      .order("deleted_at", { ascending: true }),
+  ]);
+
+  const easyWins: string[] = [];
+  const difficulties: string[] = [];
+  const consistency: RecapConsistency[] = [];
+  for (const t of tasks ?? []) {
+    if ((t.cp_count ?? 0) >= 1) {
+      consistency.push({ description: t.description, count: t.cp_count ?? 0 });
+    } else if (t.is_completed && (t.push_count ?? 0) === 0) {
+      easyWins.push(t.description);
+    } else if (t.is_completed && (t.push_count ?? 0) >= 1) {
+      difficulties.push(t.description);
+    }
+    // Untouched / still-open tasks have no journey to recap — omitted.
+  }
+  const notUseful = (deleted ?? []).map((d) => d.description);
+
+  const completedAt = new Date().toISOString();
+  const days = m.started_at
+    ? Math.max(
+        0,
+        Math.round(
+          (Date.parse(completedAt) - Date.parse(m.started_at)) / 86_400_000,
+        ),
+      )
+    : null;
+  const taskCount = (tasks ?? []).length + notUseful.length;
+
+  await supabase
+    .from("milestones")
+    .update({
+      is_completed: true,
+      completed_at: completedAt,
+      is_next_milestone: false,
+    })
+    .eq("id", milestoneId);
+
+  // Promote the nearest remaining milestone in this goal to Next.
+  const { data: nxt } = await supabase
+    .from("milestones")
+    .select("id, description, started_at")
+    .eq("goal_id", m.goal_id)
+    .eq("is_completed", false)
+    .order("display_order", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  let next: MilestoneRecap["next"] = null;
+  if (nxt) {
+    await supabase
+      .from("milestones")
+      .update({
+        is_next_milestone: true,
+        started_at: nxt.started_at ?? completedAt,
+      })
+      .eq("id", nxt.id);
+    next = { id: nxt.id, description: nxt.description };
+  }
+
+  revalidatePath("/roadmap");
+  return {
+    milestoneId,
+    title: m.description,
+    startedAt: m.started_at,
+    completedAt,
+    days,
+    taskCount,
+    easyWins,
+    notUseful,
+    difficulties,
+    consistency,
+    next,
+  };
 }
 
 export async function deleteMilestone(milestoneId: string) {
