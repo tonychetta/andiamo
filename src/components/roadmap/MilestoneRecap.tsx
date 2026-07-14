@@ -219,23 +219,17 @@ export function MilestoneRecap({
         <X size={24} />
       </button>
 
-      {/* tap zones for prev/next (Wrapped-style), disabled on the share step */}
-      {step.type !== "share" && (
-        <>
-          <button
-            aria-label="Previous"
-            onClick={prev}
-            className="absolute inset-y-0 left-0 z-0 w-1/3"
-          />
-          <button
-            aria-label="Next"
-            onClick={next}
-            className="absolute inset-y-0 right-0 z-0 w-2/3"
-          />
-        </>
-      )}
-
-      <div className="relative z-[1] flex flex-1 flex-col justify-center px-8 pb-10">
+      {/* Tap anywhere to advance (left third = back), Wrapped-style. The real
+          buttons below stopPropagation so they aren't double-fired. Disabled on
+          the share step, which needs normal interaction. */}
+      <div
+        onClick={(e) => {
+          if (step.type === "share") return;
+          if (e.clientX < window.innerWidth / 3) prev();
+          else next();
+        }}
+        className="relative z-[1] flex flex-1 flex-col justify-center px-8 pb-10"
+      >
         {step.type === "headline" && (
           <>
             <ConfettiBurst />
@@ -255,7 +249,10 @@ export function MilestoneRecap({
               </p>
               <p className="mt-1 text-lg text-white/70">Let&apos;s break it down.</p>
               <button
-                onClick={next}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  next();
+                }}
                 className="mt-10 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 font-medium text-ink"
               >
                 Start <ArrowRight size={18} />
@@ -309,7 +306,10 @@ export function MilestoneRecap({
                   </p>
                 </div>
                 <button
-                  onClick={onClose}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onClose();
+                  }}
                   className="mt-6 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 font-medium text-ink"
                 >
                   See my next milestone <ArrowRight size={18} />
@@ -321,7 +321,10 @@ export function MilestoneRecap({
                   That was the last milestone for this goal. 🎉
                 </p>
                 <button
-                  onClick={onClose}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onClose();
+                  }}
                   className="mt-6 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 font-medium text-ink"
                 >
                   Back to Roadmap <ArrowRight size={18} />
@@ -333,7 +336,10 @@ export function MilestoneRecap({
               comes next.
             </p>
             <button
-              onClick={next}
+              onClick={(e) => {
+                e.stopPropagation();
+                next();
+              }}
               className="mt-4 text-sm text-accent-gold underline underline-offset-4"
             >
               Share your win →
