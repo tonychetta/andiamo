@@ -376,10 +376,11 @@ function ShareStep({ recap, onClose }: { recap: Recap; onClose: () => void }) {
         Pick a look, then save the image to post it.
       </p>
 
-      {/* preview of the selected card */}
-      <div className="mx-auto mt-5 w-52 overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/10">
+      {/* preview of the selected card — force the injected SVG to fit the box
+          (it has an intrinsic 1080×1350 size that would otherwise overflow) */}
+      <div className="mx-auto mt-5 w-56 overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/10">
         <div
-          className="aspect-[4/5] w-full"
+          className="aspect-[4/5] w-full [&>svg]:block [&>svg]:h-full [&>svg]:w-full"
           // eslint-disable-next-line react/no-danger
           dangerouslySetInnerHTML={{ __html: svg }}
         />
