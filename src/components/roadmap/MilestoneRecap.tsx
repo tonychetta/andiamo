@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { X, ArrowRight, DownloadSimple, Confetti } from "@phosphor-icons/react";
+import { useEffect, useMemo, useState } from "react";
+import { X, ArrowRight, Export, Confetti } from "@phosphor-icons/react";
 import type { MilestoneRecap as Recap } from "@/app/(app)/roadmap/actions";
 
 // ---------- confetti (self-contained, CSS keyframes) ----------
@@ -60,7 +60,7 @@ function esc(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-// Break a title into centered lines that fit the card width.
+// Break a title into lines no wider than maxChars (word-wrapped).
 function wrapLines(text: string, maxChars: number): string[] {
   const words = text.split(/\s+/);
   const lines: string[] = [];
@@ -72,37 +72,45 @@ function wrapLines(text: string, maxChars: number): string[] {
     } else line = (line + " " + w).trim();
   }
   if (line) lines.push(line);
-  return lines.slice(0, 4);
+  return lines;
 }
 
 function cardSvg(t: Theme, title: string, days: number | null): string {
-  const lines = wrapLines(title, 18);
-  const startY = 620 - (lines.length - 1) * 42;
+  // Size the title to the full text so it never overlaps the label or clips.
+  const len = title.trim().length;
+  const fontSize = len <= 40 ? 74 : len <= 70 ? 62 : len <= 110 ? 52 : 44;
+  const maxChars = Math.max(10, Math.floor(880 / (fontSize * 0.52)));
+  const lines = wrapLines(title.trim(), maxChars);
+  const lineH = Math.round(fontSize * 1.18);
+  const firstBaseline = 580; // sits well below the "MILESTONE ACHIEVED" label
   const titleTspans = lines
     .map(
       (ln, i) =>
-        `<text x="540" y="${startY + i * 84}" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="72" fill="${t.ink}">${esc(ln)}</text>`,
+        `<text x="540" y="${firstBaseline + i * lineH}" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="${fontSize}" fill="${t.ink}">${esc(ln)}</text>`,
     )
     .join("");
+  const dayY = firstBaseline + (lines.length - 1) * lineH + 96;
   const dayLine =
     days != null
-      ? `<text x="540" y="880" text-anchor="middle" font-family="Georgia, serif" font-size="40" fill="${t.soft}">closed in ${days} day${days === 1 ? "" : "s"}</text>`
+      ? `<text x="540" y="${dayY}" text-anchor="middle" font-family="Georgia, serif" font-size="40" fill="${t.soft}">closed in ${days} day${days === 1 ? "" : "s"}</text>`
       : "";
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350">
     <rect width="1080" height="1350" fill="${t.bg}"/>
     <text x="540" y="150" text-anchor="middle" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="30" letter-spacing="14" fill="${t.soft}">ANDIAMO</text>
-    <circle cx="540" cy="330" r="66" fill="none" stroke="${t.accent}" stroke-width="5"/>
-    <path d="M508 330 l22 24 l42 -50" fill="none" stroke="${t.accent}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
-    <text x="540" y="470" text-anchor="middle" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="34" letter-spacing="6" fill="${t.accent}">MILESTONE ACHIEVED</text>
+    <circle cx="540" cy="315" r="58" fill="none" stroke="${t.accent}" stroke-width="5"/>
+    <path d="M510 315 l20 22 l40 -46" fill="none" stroke="${t.accent}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="540" y="450" text-anchor="middle" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="34" letter-spacing="6" fill="${t.accent}">MILESTONE ACHIEVED</text>
     ${titleTspans}
     ${dayLine}
-    <text x="540" y="1250" text-anchor="middle" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="26" letter-spacing="3" fill="${t.soft}">made with andiamodev.com</text>
+    <text x="540" y="1260" text-anchor="middle" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="26" letter-spacing="3" fill="${t.soft}">made with andiamodev.com</text>
   </svg>`;
 }
 
-async function downloadCard(svg: string, filename: string) {
-  const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
+// Rasterize the SVG card to a PNG blob (offscreen canvas, no dependencies).
+async function svgToPngBlob(svg: string): Promise<Blob | null> {
+  const url = URL.createObjectURL(
+    new Blob([svg], { type: "image/svg+xml;charset=utf-8" }),
+  );
   try {
     const img = new Image();
     await new Promise<void>((resolve, reject) => {
@@ -114,20 +122,13 @@ async function downloadCard(svg: string, filename: string) {
     canvas.width = 1080;
     canvas.height = 1350;
     const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    if (!ctx) return null;
     ctx.drawImage(img, 0, 0);
-    await new Promise<void>((resolve) =>
-      canvas.toBlob((b) => {
-        if (b) {
-          const a = document.createElement("a");
-          a.href = URL.createObjectURL(b);
-          a.download = filename;
-          a.click();
-          URL.revokeObjectURL(a.href);
-        }
-        resolve();
-      }, "image/png"),
+    return await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/png"),
     );
+  } catch {
+    return null;
   } finally {
     URL.revokeObjectURL(url);
   }
@@ -359,14 +360,51 @@ function ShareStep({ recap, onClose }: { recap: Recap; onClose: () => void }) {
   const [theme, setTheme] = useState(0);
   const [saving, setSaving] = useState(false);
   const svg = cardSvg(THEMES[theme], recap.title, recap.days);
+  const filename = `andiamo-milestone-${recap.title.slice(0, 24).replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.png`;
+
+  // Pre-render the PNG for the selected theme so the Save button can hand a
+  // ready file straight to the share sheet (keeping the user gesture intact —
+  // the share sheet is what lets iOS "Save Image" to Photos).
+  const [file, setFile] = useState<File | null>(null);
+  useEffect(() => {
+    let alive = true;
+    setFile(null);
+    svgToPngBlob(svg).then((blob) => {
+      if (alive && blob) setFile(new File([blob], filename, { type: "image/png" }));
+    });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [svg]);
 
   async function save() {
     setSaving(true);
     try {
-      await downloadCard(
-        svg,
-        `andiamo-milestone-${recap.title.slice(0, 24).replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.png`,
-      );
+      const blob = file ?? (await svgToPngBlob(svg));
+      if (!blob) return;
+      const shareFile =
+        blob instanceof File ? blob : new File([blob], filename, { type: "image/png" });
+      const nav = navigator as Navigator & {
+        canShare?: (d?: ShareData) => boolean;
+      };
+      // Prefer the native share sheet (offers "Save Image" → Photos on iOS).
+      if (nav.canShare?.({ files: [shareFile] }) && nav.share) {
+        try {
+          await nav.share({ files: [shareFile] });
+          return;
+        } catch (err) {
+          // User cancelled — don't also trigger a download.
+          if (err instanceof DOMException && err.name === "AbortError") return;
+        }
+      }
+      // Fallback: download (lands in Files on iOS).
+      const url = URL.createObjectURL(shareFile);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
     } finally {
       setSaving(false);
     }
@@ -379,7 +417,7 @@ function ShareStep({ recap, onClose }: { recap: Recap; onClose: () => void }) {
         <h2 className="font-serif text-3xl">Share your win</h2>
       </div>
       <p className="mt-1 text-sm text-white/70">
-        Pick a look, then save the image to post it.
+        Pick a look, then save it to your photos to post.
       </p>
 
       {/* preview of the selected card — force the injected SVG to fit the box
@@ -417,8 +455,8 @@ function ShareStep({ recap, onClose }: { recap: Recap; onClose: () => void }) {
         disabled={saving}
         className="mt-6 inline-flex items-center justify-center gap-2 rounded-full bg-white px-6 py-3 font-medium text-ink disabled:opacity-60"
       >
-        <DownloadSimple size={18} />
-        {saving ? "Saving…" : "Save image"}
+        <Export size={18} />
+        {saving ? "Opening…" : "Save to Photos"}
       </button>
       <button
         onClick={onClose}
