@@ -89,17 +89,15 @@ export function VisionView({
             <p className="text-xs uppercase tracking-[0.18em] text-ink-soft">
               {CATEGORY_LABEL[goal.category] ?? goal.category}
             </p>
-            {canEdit ? (
-              <EditableBlock
-                value={goal.description}
-                onSave={(text) => updateGoalDescription(goal.id, text)}
-                render={(text) => (
-                  <p className="mt-2 leading-relaxed text-ink">{text}</p>
-                )}
-              />
-            ) : (
-              <p className="mt-2 leading-relaxed text-ink">{goal.description}</p>
-            )}
+            {/* Goals are editable by the artist AND their coach (clarifying
+                wording). The Vision statement above stays artist-only. */}
+            <EditableBlock
+              value={goal.description}
+              onSave={(text) => updateGoalDescription(goal.id, text)}
+              render={(text) => (
+                <p className="mt-2 leading-relaxed text-ink">{text}</p>
+              )}
+            />
           </div>
         ))}
       </div>

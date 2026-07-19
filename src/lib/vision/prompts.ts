@@ -92,8 +92,11 @@ A developing artist is held up by three legs, and missing even one tips the stoo
 2. revenue_generating (Revenue)
 3. team (Team)
 Never use any other category. Always produce all three, even if the artist emphasized one — the other legs are what make that one possible.
-- Each Goal is a SINGLE, singular aspiration — the one biggest outcome in that category — written as a SMART goal: Specific, Measurable, time-bound, and clearly tied to the artist's Vision and what they said. Include that aspiration's defining details: its end target/scale, the artist's target YEAR for it, and the key qualifiers they gave. Examples: "Headline a stadium world tour by 2031" (NOT just "headline a stadium world tour"); "Earn $5M per year from music by 2032, driven by touring, sync placements, and streaming" (name the revenue sources the artist actually mentioned).
-- "Singular" means ONE aspiration per Goal, not vague. Don't merge two different category aspirations into one Goal, and don't chain together a list of milestones — but DO keep the goal's own end-state target, year, and defining specifics.
+- Each Goal is ONE short, clear sentence naming the single biggest outcome in that category — its end target/scale and the artist's target YEAR, and nothing else. Keep only the main point. STRIP everything else: audience descriptions, revenue-source lists, growth paths, current numbers, emotional color, and qualifiers. Aim for roughly 6–12 words. It should still be Measurable and time-bound (a concrete target + a year), and tied to what the artist actually said.
+  - GOOD: "Headline a sold-out, national arena tour by 2031."
+  - TOO WORDY (do NOT do this): "Headline and sell out arena shows on a national tour by 2031, with my core audience of women 20-40 singing my lyrics back to me, growing from today's 75-100 ticket rooms up through opener slots and my own headline theater runs."
+  - GOOD: "Earn $5M a year from music by 2032."  ·  GOOD: "Build a full-time team of five by 2030."
+- "Singular" means ONE aspiration per Goal. Don't merge two categories into one Goal, and don't chain together a list of milestones or qualifiers — just the headline outcome and its year.
 - The smaller INTERMEDIATE stepping-stones that lead UP to the Goal (interim metrics and earlier dates — e.g. "reach 1M monthly listeners by 2028", "book a 4-month tour") are Milestones for the Roadmap, so leave those out of the Goal itself.
 - Use ALL relevant information from the conversation to make each Goal specific and accurate. Do not tell the artist about the leg/category logic; just produce a complete, sensible set.
 

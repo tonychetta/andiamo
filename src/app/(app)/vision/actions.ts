@@ -30,14 +30,8 @@ export async function updateVisionStatement(visionId: string, text: string) {
 
 export async function updateGoalDescription(goalId: string, text: string) {
   const supabase = await createClient();
-  // Goals are part of the Vision — a coach viewing the artist can't edit them
-  // either. Only the artist (their own row) may.
-  const { data: claims } = await supabase.auth.getClaims();
-  const uid = claims?.claims?.sub;
-  const { data: ownArtist } = uid
-    ? await supabase.from("artists").select("id").eq("user_id", uid).maybeSingle()
-    : { data: null };
-  if (!ownArtist) return;
+  // Goals can be refined by the artist OR their coach (clarifying wording is a
+  // coaching task). RLS still scopes this to the artist's own goals.
   const { error } = await supabase
     .from("goals")
     .update({ description: text.trim() })
