@@ -1,16 +1,11 @@
 "use client";
 
-import {
-  Fragment,
-  useEffect,
-  useRef,
-  useState,
-  useTransition,
-} from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  AnimatePresence,
   motion,
   Reorder,
   useDragControls,
@@ -630,6 +625,20 @@ function NextCardContent({
     { description: string; reason: string; selected: boolean }[] | null
   >(null);
   const [error, setError] = useState<string | null>(null);
+  // Completing a task: cross it out, then let it fade + collapse off the card.
+  const [crossing, setCrossing] = useState<Set<string>>(new Set());
+  const [removed, setRemoved] = useState<Set<string>>(new Set());
+
+  function completeTask(id: string) {
+    setCrossing((s) => new Set(s).add(id));
+    setTimeout(() => {
+      setRemoved((s) => new Set(s).add(id));
+      startTransition(async () => {
+        await setTaskStatus(id, "completed");
+        router.refresh();
+      });
+    }, 650);
+  }
 
   async function suggest() {
     setSuggesting(true);
@@ -811,20 +820,39 @@ function NextCardContent({
       </div>
 
       <div className="mt-2 space-y-1">
-        {topLevel.map((t) => (
-          <Fragment key={t.id}>
-            <TaskRow task={t} allTasks={tasks} indented={false} locked={false} />
-            {childrenOf(t.id).map((c) => (
-              <TaskRow
-                key={c.id}
-                task={c}
-                allTasks={tasks}
-                indented
-                locked={!taskIsDone(t)}
-              />
+        <AnimatePresence initial={false}>
+          {topLevel
+            .filter((t) => t.status !== "completed" && !removed.has(t.id))
+            .flatMap((t) => [
+              { task: t, indented: false, locked: false },
+              ...childrenOf(t.id)
+                .filter((c) => c.status !== "completed" && !removed.has(c.id))
+                .map((c) => ({
+                  task: c,
+                  indented: true,
+                  locked: !taskIsDone(t),
+                })),
+            ])
+            .map((r) => (
+              <motion.div
+                key={r.task.id}
+                layout
+                initial={false}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.35, ease: "easeInOut" }}
+                style={{ overflow: "hidden" }}
+              >
+                <TaskRow
+                  task={r.task}
+                  allTasks={tasks}
+                  indented={r.indented}
+                  locked={r.locked}
+                  crossedOut={crossing.has(r.task.id)}
+                  onComplete={completeTask}
+                />
+              </motion.div>
             ))}
-          </Fragment>
-        ))}
+        </AnimatePresence>
         {tasks.length === 0 && !addingTask && (
           <p className="text-sm text-ink-soft">
             No tasks yet. Tap the stars for suggestions, or + to add your own.
@@ -902,11 +930,15 @@ function TaskRow({
   allTasks,
   indented,
   locked,
+  crossedOut = false,
+  onComplete,
 }: {
   task: Task;
   allTasks: Task[];
   indented: boolean;
   locked: boolean;
+  crossedOut?: boolean;
+  onComplete: (id: string) => void;
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -978,7 +1010,7 @@ function TaskRow({
     });
   }
 
-  const done = taskIsDone(task);
+  const done = taskIsDone(task) || crossedOut;
   const hasChildren = allTasks.some((t) => t.parent_task_id === task.id);
   // Eligible parents: other top-level tasks (one level of nesting only).
   const candidates = allTasks.filter(
@@ -1114,7 +1146,11 @@ function TaskRow({
             ) : (
               <>
                 <MenuItem
-                  onClick={() => run(() => setTaskStatus(task.id, "completed"))}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setDepMode(false);
+                    onComplete(task.id);
+                  }}
                 >
                   Complete
                 </MenuItem>
