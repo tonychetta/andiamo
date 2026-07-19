@@ -915,6 +915,37 @@ function TaskRow({
   const [menuOpen, setMenuOpen] = useState(false);
   const [depMode, setDepMode] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
+  // Portal position for the menu — anchored to the button, flipped upward when
+  // there isn't room below (rows near the bottom of the screen).
+  const [menuPos, setMenuPos] = useState<{
+    top?: number;
+    bottom?: number;
+    right: number;
+    maxH: number;
+  } | null>(null);
+
+  function toggleMenu() {
+    setDepMode(false);
+    if (menuOpen) {
+      setMenuOpen(false);
+      return;
+    }
+    const r = menuBtnRef.current?.getBoundingClientRect();
+    if (r) {
+      const right = window.innerWidth - r.right;
+      const below = window.innerHeight - r.bottom - 12;
+      const above = r.top - 12;
+      const openUp = below < 260 && above > below;
+      const maxH = Math.min(288, openUp ? above : below);
+      setMenuPos(
+        openUp
+          ? { bottom: window.innerHeight - r.top + 6, right, maxH }
+          : { top: r.bottom + 6, right, maxH },
+      );
+    }
+    setMenuOpen(true);
+  }
 
   useEffect(() => {
     if (!editing) return;
@@ -1030,26 +1061,34 @@ function TaskRow({
       )}
 
       <button
-        onClick={() => {
-          setDepMode(false);
-          setMenuOpen((o) => !o);
-        }}
+        ref={menuBtnRef}
+        onClick={toggleMenu}
         aria-label="Task options"
         className="mt-0.5 shrink-0 text-ink-soft transition-colors hover:text-ink"
       >
         <DotsThree size={20} weight="bold" />
       </button>
 
-      {menuOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => {
-              setMenuOpen(false);
-              setDepMode(false);
-            }}
-          />
-          <div className="absolute right-0 top-7 z-50 max-h-72 w-60 overflow-y-auto rounded-xl border border-line bg-surface-primary py-1 shadow-lg">
+      {menuOpen &&
+        menuPos &&
+        createPortal(
+          <>
+            <div
+              className="fixed inset-0 z-[90]"
+              onClick={() => {
+                setMenuOpen(false);
+                setDepMode(false);
+              }}
+            />
+            <div
+              className="fixed z-[100] w-60 overflow-y-auto rounded-xl border border-line bg-surface-primary py-1 shadow-lg"
+              style={{
+                top: menuPos.top,
+                bottom: menuPos.bottom,
+                right: menuPos.right,
+                maxHeight: menuPos.maxH,
+              }}
+            >
             {depMode ? (
               <>
                 <p className="px-4 py-2 text-xs uppercase tracking-wide text-ink-soft">
@@ -1116,8 +1155,9 @@ function TaskRow({
               </>
             )}
           </div>
-        </>
-      )}
+        </>,
+          document.body,
+        )}
       </motion.div>
     </div>
   );
