@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { weekBounds } from "@/lib/wtf/compile";
 
 // RLS guarantees every mutation here only touches the signed-in artist's rows.
 
@@ -9,6 +10,17 @@ async function artistId() {
   const supabase = await createClient();
   const { data } = await supabase.rpc("current_artist_id");
   return { supabase, artistId: data as string | null };
+}
+
+// The Sunday-anchored start of the current week (WTF weeks are week-scoped).
+function thisWeekStart(): string {
+  return weekBounds(new Date().toISOString().slice(0, 10)).start;
+}
+function addDaysStr(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d) + days * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
 }
 
 // ---------- Tasks ----------
@@ -121,15 +133,26 @@ export async function setTaskStatus(
     is_recurring?: boolean;
     push_count?: number;
     cp_count?: number;
+    on_wtf?: boolean;
+    wtf_week?: string;
   } = {
     status,
     is_completed: done,
     completed_at: done ? new Date().toISOString() : null,
   };
-  if (status === "pushed") update.push_count = (cur?.push_count ?? 0) + 1;
+  // Pushed and recurring tasks carry into next week's WTF; everything else
+  // stays on the week it was worked (completed tasks just drop off next week).
+  const nextWeek = addDaysStr(thisWeekStart(), 7);
+  if (status === "pushed") {
+    update.push_count = (cur?.push_count ?? 0) + 1;
+    update.on_wtf = true;
+    update.wtf_week = nextWeek;
+  }
   if (status === "complete_and_push") {
     update.is_recurring = true;
     update.cp_count = (cur?.cp_count ?? 0) + 1;
+    update.on_wtf = true;
+    update.wtf_week = nextWeek;
   }
   const { error } = await supabase.from("tasks").update(update).eq("id", taskId);
   if (error) throw new Error(error.message);
@@ -371,7 +394,10 @@ export async function reorderMilestones(
 // Swipe a Milestone Task onto (or off of) the current week's WTF.
 export async function setTaskOnWtf(taskId: string, on: boolean) {
   const supabase = await createClient();
-  const patch = on ? { on_wtf: true } : { on_wtf: false, wtf_priority: false };
+  // Adding a task stamps it for the CURRENT week; removing clears the stamp.
+  const patch = on
+    ? { on_wtf: true, wtf_week: thisWeekStart() }
+    : { on_wtf: false, wtf_priority: false, wtf_week: null };
   const { error } = await supabase.from("tasks").update(patch).eq("id", taskId);
   if (error) throw new Error(error.message);
   revalidatePath("/roadmap");
@@ -390,7 +416,7 @@ export async function setTaskPriority(taskId: string) {
     .eq("wtf_priority", true);
   const { error } = await supabase
     .from("tasks")
-    .update({ wtf_priority: true, on_wtf: true })
+    .update({ wtf_priority: true, on_wtf: true, wtf_week: thisWeekStart() })
     .eq("id", taskId);
   if (error) throw new Error(error.message);
   revalidatePath("/roadmap");

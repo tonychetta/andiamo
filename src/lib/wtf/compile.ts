@@ -72,6 +72,7 @@ export async function compileWtf(
         "id, description, status, wtf_priority, assigned_coach_id, push_reason, display_order, milestones(goals(category))",
       )
       .eq("on_wtf", true)
+      .eq("wtf_week", weekStart)
       .order("display_order", { ascending: true }),
     supabase
       .from("release_tasks")

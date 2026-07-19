@@ -849,6 +849,7 @@ export type Database = {
           status: Database["public"]["Enums"]["task_status"]
           updated_at: string
           wtf_priority: boolean
+          wtf_week: string | null
         }
         Insert: {
           artist_id: string
@@ -870,6 +871,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["task_status"]
           updated_at?: string
           wtf_priority?: boolean
+          wtf_week?: string | null
         }
         Update: {
           artist_id?: string
@@ -891,6 +893,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["task_status"]
           updated_at?: string
           wtf_priority?: boolean
+          wtf_week?: string | null
         }
         Relationships: [
           {

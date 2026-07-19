@@ -1,9 +1,13 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { RoadmapView } from "@/components/roadmap/RoadmapView";
+import { weekBounds } from "@/lib/wtf/compile";
 
 export default async function RoadmapPage() {
   const supabase = await createClient();
+  // WTF membership is week-scoped, so the roadmap's "WTF" badge/swipe state only
+  // counts tasks stamped for the current week.
+  const currentWeek = weekBounds(new Date().toISOString().slice(0, 10)).start;
 
   const { data: vision } = await supabase
     .from("visions")
@@ -48,7 +52,7 @@ export default async function RoadmapPage() {
       supabase
         .from("tasks")
         .select(
-          "id, milestone_id, description, display_order, is_completed, status, parent_task_id, on_wtf, wtf_priority",
+          "id, milestone_id, description, display_order, is_completed, status, parent_task_id, on_wtf, wtf_priority, wtf_week",
         )
         .order("display_order", { ascending: true }),
     ]);
@@ -87,8 +91,9 @@ export default async function RoadmapPage() {
         is_completed: t.is_completed,
         status: t.status,
         parent_task_id: t.parent_task_id,
-        on_wtf: t.on_wtf,
-        wtf_priority: t.wtf_priority,
+        // Only counts if stamped for the current week.
+        on_wtf: t.on_wtf && t.wtf_week === currentWeek,
+        wtf_priority: t.wtf_priority && t.wtf_week === currentWeek,
       })),
     })),
   }));
