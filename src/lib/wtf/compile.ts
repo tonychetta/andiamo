@@ -183,20 +183,47 @@ export function buildWtfHtml(
     (m) => !m.assignedCoachId || !coachIds.has(m.assignedCoachId),
   );
 
+  // A column's worth of task rows (wrapped in its own table), or an em dash.
+  const colList = (rows: string) =>
+    rows
+      ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>`
+      : `<div style="color:${soft};font-size:13px;padding:6px 0;">Nothing assigned</div>`;
+  // A column header: name + role, with a colored accent bar so the two sides
+  // read as clearly distinct owners.
+  const colHead = (name: string, role: string, accent: string) =>
+    `<div style="border-left:3px solid ${accent};padding-left:8px;margin-bottom:8px;">
+       <div style="color:${ink};font-size:13px;font-weight:700;line-height:1.2;">${name}</div>
+       <div style="color:${soft};font-size:10px;letter-spacing:1.5px;text-transform:uppercase;margin-top:1px;">${role}</div>
+     </div>`;
+
   // No coaches assigned → single "Milestone Tasks" list (DIY-style).
-  // Coaches assigned → split by assignee.
+  // Coaches assigned → two tinted columns: artist on the left, coach(es) right.
+  const coachColumn = coaches
+    .map((c) => {
+      const rows = groupRows(
+        w.milestones.filter((m) => m.assignedCoachId === c.id),
+      );
+      return `${colHead(c.name, "Coach", gold)}${colList(rows)}`;
+    })
+    .join(`<div style="height:14px;"></div>`);
+
   const milestoneSections = coaches.length
-    ? section(`${artistName || "Artist"} (Artist)`, groupRows(artistTasks)) +
-      coaches
-        .map((c) =>
-          section(
-            `${c.name} (Coach)`,
-            groupRows(
-              w.milestones.filter((m) => m.assignedCoachId === c.id),
-            ),
-          ),
-        )
-        .join("")
+    ? `<tr><td style="padding:18px 0 6px;"><div style="color:${soft};font-size:11px;letter-spacing:2px;text-transform:uppercase;">Milestone Tasks</div></td></tr>
+       <tr><td>
+         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="table-layout:fixed;"><tr>
+           <td valign="top" width="50%" style="padding-right:5px;">
+             <div style="background:#f3eee3;border-radius:12px;padding:12px 12px 4px;height:100%;">
+               ${colHead(artistName || "Artist", "Artist", ink)}
+               ${colList(groupRows(artistTasks))}
+             </div>
+           </td>
+           <td valign="top" width="50%" style="padding-left:5px;">
+             <div style="background:#faf4e6;border-radius:12px;padding:12px 12px 4px;height:100%;">
+               ${coachColumn}
+             </div>
+           </td>
+         </tr></table>
+       </td></tr>`
     : section("Milestone Tasks", groupRows(w.milestones));
 
   const releaseRows = w.releases
