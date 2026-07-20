@@ -354,7 +354,9 @@ function ReleaseCard({
         <Trash size={16} />
       </button>
 
-      {open && <ReleaseDetail release={release} siblings={siblings} />}
+      {open && (
+        <ReleaseDetail release={release} siblings={siblings} today={today} />
+      )}
       {confirmDelete && (
         <DeleteReleaseModal
           release={release}
@@ -436,13 +438,16 @@ function DeleteReleaseModal({
 function ReleaseDetail({
   release,
   siblings,
+  today,
 }: {
   release: Release;
   siblings: ReleaseLite[];
+  today: string;
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [addingPhase, setAddingPhase] = useState<number | null>(null);
+  const [showPast, setShowPast] = useState(false);
   const [taskDraft, setTaskDraft] = useState("");
   const [editingDate, setEditingDate] = useState(false);
   const [dateDraft, setDateDraft] = useState(release.release_date ?? "");
@@ -506,6 +511,18 @@ function ReleaseDetail({
         tasks: [t],
       });
   }
+
+  // The "current" checkpoint is the latest phase whose date has already arrived;
+  // phases before it are past and hidden by default (keeps the current week
+  // visible until the next checkpoint hits, so tasks aren't buried).
+  let currentIdx = -1;
+  phases.forEach((p, idx) => {
+    if (p.date && dayDiff(today, p.date) <= 0) currentIdx = idx;
+  });
+  const pastCount = currentIdx > 0 ? currentIdx : 0;
+  const visiblePhases = phases
+    .map((p, origIdx) => ({ ...p, origIdx }))
+    .filter((p) => showPast || p.origIdx >= currentIdx);
 
   function submitPhaseTask(
     label: string,
@@ -599,12 +616,34 @@ function ReleaseDetail({
         </div>
       )}
 
+      {/* Past weeks are tucked away so the current week sits at the top. */}
+      {pastCount > 0 && (
+        <button
+          onClick={() => setShowPast((s) => !s)}
+          className="mb-4 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-line py-2 text-xs text-ink-soft transition-colors hover:text-ink"
+        >
+          {showPast ? (
+            <>
+              <CaretUp size={13} /> Hide {pastCount} earlier week
+              {pastCount > 1 ? "s" : ""}
+            </>
+          ) : (
+            <>
+              <CaretDown size={13} /> Show {pastCount} earlier week
+              {pastCount > 1 ? "s" : ""}
+            </>
+          )}
+        </button>
+      )}
+
       {/* Phase-by-phase schedule */}
       <div className="space-y-6">
-        {phases.map((phase, i) => (
+        {visiblePhases.map((phase, vi) => {
+          const i = phase.origIdx;
+          return (
           <div key={`${phase.label}-${i}`}>
             {/* Phase separator — shown once, above the first week of each phase */}
-            {phase.group && phase.group !== phases[i - 1]?.group && (
+            {phase.group && phase.group !== visiblePhases[vi - 1]?.group && (
               <p className="mb-3 border-b border-line pb-1.5 font-serif text-lg text-accent-gold">
                 {phase.group}
               </p>
@@ -670,7 +709,8 @@ function ReleaseDetail({
               </button>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <LaunchPlanner releaseId={release.id} onRun={run} />
