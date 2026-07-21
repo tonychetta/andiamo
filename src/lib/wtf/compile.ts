@@ -77,6 +77,7 @@ export async function compileWtf(
     supabase
       .from("release_tasks")
       .select("id, description, is_completed, due_date, releases(title)")
+      .eq("is_completed", false) // already-done release tasks stay off the WTF
       .gte("due_date", weekStart)
       .lte("due_date", weekEnd)
       .order("due_date", { ascending: true }),
