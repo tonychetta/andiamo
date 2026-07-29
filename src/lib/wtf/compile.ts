@@ -165,22 +165,30 @@ export function buildWtfHtml(
   const gold = "#c7a35c";
   const cream = "#f7f3ec";
 
-  const li = (text: string, sub?: string, isPriority = false) => `
+  const brightGold = "#f2c14e";
+  const li = (text: string, sub?: string, isPriority = false) => {
+    const marker = isPriority
+      ? `<span style="color:${brightGold};font-size:17px;line-height:1;margin-right:8px;text-shadow:0 0 8px rgba(242,193,78,0.95),0 0 3px ${brightGold};">&#9733;</span>`
+      : `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#cfc6ba;margin-right:10px;vertical-align:middle;"></span>`;
+    return `
     <tr><td style="padding:8px 0;border-bottom:1px solid #e7e0d5;">
-      <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${
-        isPriority ? gold : "#cfc6ba"
-      };margin-right:10px;${isPriority ? `box-shadow:0 0 6px ${gold};` : ""}"></span>
-      <span style="color:${ink};font-size:15px;">${text}</span>
-      ${sub ? `<div style="color:${soft};font-size:12px;margin:2px 0 0 20px;">${sub}</div>` : ""}
+      ${marker}
+      <span style="color:${ink};font-size:15px;${isPriority ? "font-weight:600;" : ""}">${text}</span>
+      ${sub ? `<div style="color:${soft};font-size:12px;margin:2px 0 0 22px;">${sub}</div>` : ""}
     </td></tr>`;
+  };
 
   const section = (title: string, rows: string) =>
     rows
       ? `<tr><td style="padding:18px 0 6px;"><div style="color:${soft};font-size:11px;letter-spacing:2px;text-transform:uppercase;">${title}</div></td></tr>${rows}`
       : "";
 
+  // Priority task floats to the top of its column, then the rest in order.
   const groupRows = (tasks: CompiledWtf["milestones"]) =>
-    tasks.map((m) => li(m.description, m.goalLabel, m.priority)).join("");
+    [...tasks]
+      .sort((a, b) => Number(b.priority) - Number(a.priority))
+      .map((m) => li(m.description, m.goalLabel, m.priority))
+      .join("");
 
   const coachIds = new Set(coaches.map((c) => c.id));
   // Tasks with no coach (or an unknown/removed coach) belong to the artist.
