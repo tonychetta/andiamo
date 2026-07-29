@@ -20,6 +20,7 @@ export type CompiledWtf = {
     completed: boolean;
     dueDate: string | null;
     releaseTitle: string;
+    assignedCoachId: string | null;
   }[];
   content: {
     id: string;
@@ -76,7 +77,9 @@ export async function compileWtf(
       .order("display_order", { ascending: true }),
     supabase
       .from("release_tasks")
-      .select("id, description, is_completed, due_date, releases(title)")
+      .select(
+        "id, description, is_completed, due_date, assigned_coach_id, releases(title)",
+      )
       .eq("is_completed", false) // already-done release tasks stay off the WTF
       .gte("due_date", weekStart)
       .lte("due_date", weekEnd)
@@ -114,6 +117,7 @@ export async function compileWtf(
       completed: r.is_completed,
       dueDate: r.due_date,
       releaseTitle: rel?.title ?? "",
+      assignedCoachId: r.assigned_coach_id ?? null,
     };
   });
 
@@ -197,25 +201,24 @@ export function buildWtfHtml(
        <div style="color:${soft};font-size:10px;letter-spacing:1.5px;text-transform:uppercase;margin-top:1px;">${role}</div>
      </div>`;
 
-  // No coaches assigned → single "Milestone Tasks" list (DIY-style).
-  // Coaches assigned → two tinted columns: artist on the left, coach(es) right.
-  const coachColumn = coaches
-    .map((c) => {
-      const rows = groupRows(
-        w.milestones.filter((m) => m.assignedCoachId === c.id),
-      );
-      return `${colHead(c.name, "Coach", gold)}${colList(rows)}`;
-    })
-    .join(`<div style="height:14px;"></div>`);
-
-  const milestoneSections = coaches.length
-    ? `<tr><td style="padding:18px 0 6px;"><div style="color:${soft};font-size:11px;letter-spacing:2px;text-transform:uppercase;">Milestone Tasks</div></td></tr>
+  // No coaches → single list (DIY-style). Coaches → two tinted columns: artist
+  // on the left, coach(es) on the right. Shared by Milestone and Release tasks.
+  const twoColumnSection = (
+    label: string,
+    artistRows: string,
+    coachEntries: { name: string; rows: string }[],
+  ) => {
+    if (!coaches.length) return section(label, artistRows);
+    const coachColumn = coachEntries
+      .map((e) => `${colHead(e.name, "Coach", gold)}${colList(e.rows)}`)
+      .join(`<div style="height:14px;"></div>`);
+    return `<tr><td style="padding:18px 0 6px;"><div style="color:${soft};font-size:11px;letter-spacing:2px;text-transform:uppercase;">${label}</div></td></tr>
        <tr><td>
          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="table-layout:fixed;"><tr>
            <td valign="top" width="50%" style="padding-right:5px;">
              <div style="background:#f3eee3;border-radius:12px;padding:12px 12px 4px;height:100%;">
                ${colHead(artistName || "Artist", "Artist", ink)}
-               ${colList(groupRows(artistTasks))}
+               ${colList(artistRows)}
              </div>
            </td>
            <td valign="top" width="50%" style="padding-left:5px;">
@@ -224,12 +227,35 @@ export function buildWtfHtml(
              </div>
            </td>
          </tr></table>
-       </td></tr>`
-    : section("Milestone Tasks", groupRows(w.milestones));
+       </td></tr>`;
+  };
 
-  const releaseRows = w.releases
-    .map((r) => li(r.description, r.releaseTitle))
-    .join("");
+  const milestoneSections = twoColumnSection(
+    "Milestone Tasks",
+    groupRows(artistTasks),
+    coaches.map((c) => ({
+      name: c.name,
+      rows: groupRows(w.milestones.filter((m) => m.assignedCoachId === c.id)),
+    })),
+  );
+
+  // Release tasks split by assignee, same rule as milestones.
+  const releaseRow = (r: CompiledWtf["releases"][number]) =>
+    li(r.description, r.releaseTitle);
+  const artistReleases = w.releases.filter(
+    (r) => !r.assignedCoachId || !coachIds.has(r.assignedCoachId),
+  );
+  const releaseSections = twoColumnSection(
+    "Release Tasks",
+    artistReleases.map(releaseRow).join(""),
+    coaches.map((c) => ({
+      name: c.name,
+      rows: w.releases
+        .filter((r) => r.assignedCoachId === c.id)
+        .map(releaseRow)
+        .join(""),
+    })),
+  );
 
   // Content as a Sun–Sat week calendar with pills in each day.
   const wd = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -268,10 +294,10 @@ export function buildWtfHtml(
           ${artistName ? `<div style="color:${soft};font-size:14px;margin-top:4px;">${artistName}</div>` : ""}
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
             ${milestoneSections}
-            ${section("Release Tasks", releaseRows)}
+            ${releaseSections}
             ${contentCalendar}
             ${
-              !w.milestones.length && !releaseRows && !w.content.length
+              !w.milestones.length && !w.releases.length && !w.content.length
                 ? `<tr><td style="padding:18px 0;color:${soft};font-size:14px;">No tasks on the WTF this week.</td></tr>`
                 : ""
             }

@@ -46,6 +46,7 @@ type Release = {
   completed: boolean;
   dueDate: string | null;
   releaseTitle: string;
+  assignedCoachId: string | null;
 };
 type Content = {
   id: string;
@@ -139,6 +140,35 @@ export function WTFView({
     compiled.releases.length === 0 &&
     compiled.content.length === 0;
 
+  // Release rows split by assignee (mirrors the milestone split for DWY).
+  const artistReleases = compiled.releases.filter(
+    (r) => !r.assignedCoachId || !coaches.some((c) => c.id === r.assignedCoachId),
+  );
+  const renderRelease = (r: Release) => (
+    <label
+      key={r.id}
+      className="flex cursor-pointer items-start gap-2.5 py-1.5"
+    >
+      <input
+        type="checkbox"
+        checked={r.completed}
+        onChange={() => run(() => toggleReleaseTask(r.id, !r.completed))}
+        className="mt-1"
+      />
+      <span>
+        <span
+          className={`text-sm ${r.completed ? "text-ink-soft line-through" : "text-ink"}`}
+        >
+          {r.description}
+        </span>
+        <span className="block text-xs text-ink-soft">
+          {r.releaseTitle}
+          {r.dueDate ? ` · ${fmtDay(r.dueDate)}` : ""}
+        </span>
+      </span>
+    </label>
+  );
+
   return (
     <section className="pb-4">
       <Link
@@ -221,32 +251,30 @@ export function WTFView({
 
           {compiled.releases.length > 0 && (
             <Section title="Release Tasks">
-              {compiled.releases.map((r) => (
-                <label
-                  key={r.id}
-                  className="flex cursor-pointer items-start gap-2.5 py-1.5"
-                >
-                  <input
-                    type="checkbox"
-                    checked={r.completed}
-                    onChange={() =>
-                      run(() => toggleReleaseTask(r.id, !r.completed))
-                    }
-                    className="mt-1"
-                  />
-                  <span>
-                    <span
-                      className={`text-sm ${r.completed ? "text-ink-soft line-through" : "text-ink"}`}
-                    >
-                      {r.description}
-                    </span>
-                    <span className="block text-xs text-ink-soft">
-                      {r.releaseTitle}
-                      {r.dueDate ? ` · ${fmtDay(r.dueDate)}` : ""}
-                    </span>
-                  </span>
-                </label>
-              ))}
+              {tier === "dwy" && coaches.length > 0 ? (
+                <>
+                  {artistReleases.length > 0 && (
+                    <div>
+                      <ReleaseSubHead>{`${artistName} · Artist`}</ReleaseSubHead>
+                      {artistReleases.map(renderRelease)}
+                    </div>
+                  )}
+                  {coaches.map((c) => {
+                    const cr = compiled.releases.filter(
+                      (r) => r.assignedCoachId === c.id,
+                    );
+                    if (!cr.length) return null;
+                    return (
+                      <div key={c.id} className="mt-3">
+                        <ReleaseSubHead>{`${c.name} · Coach`}</ReleaseSubHead>
+                        {cr.map(renderRelease)}
+                      </div>
+                    );
+                  })}
+                </>
+              ) : (
+                compiled.releases.map(renderRelease)
+              )}
             </Section>
           )}
 
@@ -357,6 +385,15 @@ function Section({
         {children}
       </div>
     </div>
+  );
+}
+
+// A small assignee sub-header inside the Release Tasks section (DWY split).
+function ReleaseSubHead({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="mb-0.5 mt-1 text-[11px] font-semibold uppercase tracking-wide text-ink-soft">
+      {children}
+    </p>
   );
 }
 
