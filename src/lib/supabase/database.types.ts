@@ -619,6 +619,7 @@ export type Database = {
       release_tasks: {
         Row: {
           artist_id: string
+          assigned_coach_id: string | null
           assigned_to: Database["public"]["Enums"]["release_assignee"]
           completed_at: string | null
           created_at: string
@@ -637,6 +638,7 @@ export type Database = {
         }
         Insert: {
           artist_id: string
+          assigned_coach_id?: string | null
           assigned_to?: Database["public"]["Enums"]["release_assignee"]
           completed_at?: string | null
           created_at?: string
@@ -655,6 +657,7 @@ export type Database = {
         }
         Update: {
           artist_id?: string
+          assigned_coach_id?: string | null
           assigned_to?: Database["public"]["Enums"]["release_assignee"]
           completed_at?: string | null
           created_at?: string

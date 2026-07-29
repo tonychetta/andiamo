@@ -193,6 +193,21 @@ export async function toggleReleaseTask(taskId: string, completed: boolean) {
   revalidatePath("/releases");
 }
 
+// Assign a release task to a coach, or back to the artist (null). RLS scopes
+// this to the artist's own tasks.
+export async function setReleaseTaskAssignee(
+  taskId: string,
+  coachId: string | null,
+) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("release_tasks")
+    .update({ assigned_coach_id: coachId })
+    .eq("id", taskId);
+  if (error) throw new Error(error.message);
+  revalidatePath("/releases");
+}
+
 export async function updateReleaseTask(taskId: string, description: string) {
   const supabase = await createClient();
   const { error } = await supabase

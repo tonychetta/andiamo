@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { ReleasesView } from "@/components/releases/ReleasesView";
 import {
   fetchProductionStatus,
@@ -23,7 +24,7 @@ export default async function ReleasesPage() {
     supabase
       .from("release_tasks")
       .select(
-        "id, release_id, description, assigned_to, phase_group, phase_label, week_title, offset_days, due_date, is_completed, is_custom, display_order",
+        "id, release_id, description, assigned_to, assigned_coach_id, phase_group, phase_label, week_title, offset_days, due_date, is_completed, is_custom, display_order",
       )
       .order("offset_days", { ascending: true })
       .order("display_order", { ascending: true }),
@@ -80,12 +81,50 @@ export default async function ReleasesPage() {
   // Pass the server's "today" so the countdown is deterministic (no hydration drift).
   const today = new Date().toISOString().slice(0, 10);
 
+  // The artist + their coaches, for assigning release tasks (DWY). Looked up via
+  // admin so it works whether the artist or a coach is viewing.
+  const { data: aid } = await supabase.rpc("current_artist_id");
+  let artistName = "Artist";
+  let coaches: { id: string; name: string }[] = [];
+  if (aid) {
+    const admin = createAdminClient();
+    const [{ data: artistRow }, { data: links }] = await Promise.all([
+      admin.from("artists").select("artist_name").eq("id", aid).maybeSingle(),
+      admin
+        .from("artist_coaches")
+        .select("coaches(id, user_id)")
+        .eq("artist_id", aid),
+    ]);
+    artistName = artistRow?.artist_name?.trim() || "Artist";
+    const rows = (links ?? [])
+      .map((l) => l.coaches as { id: string; user_id: string } | null)
+      .filter(Boolean) as { id: string; user_id: string }[];
+    if (rows.length) {
+      const { data: profs } = await admin
+        .from("profiles")
+        .select("id, name")
+        .in(
+          "id",
+          rows.map((r) => r.user_id),
+        );
+      const nameByUser = new Map(
+        (profs ?? []).map((p) => [p.id, p.name?.trim() || "Coach"]),
+      );
+      coaches = rows.map((r) => ({
+        id: r.id,
+        name: nameByUser.get(r.user_id) ?? "Coach",
+      }));
+    }
+  }
+
   return (
     <ReleasesView
       releases={releasesData}
       today={today}
       production={production}
       templates={templates}
+      coaches={coaches}
+      artistName={artistName}
     />
   );
 }

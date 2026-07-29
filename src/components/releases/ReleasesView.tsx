@@ -21,17 +21,20 @@ import {
   addReleaseTask,
   addLaunchTasks,
   deleteReleaseTask,
+  setReleaseTaskAssignee,
 } from "@/app/(app)/releases/actions";
 import { TemplateEditor, type TemplatesProp } from "./TemplateEditor";
 
 type ReleaseType = "single" | "project";
 type Assignee = "artist" | "producer" | "both" | "unassigned";
+type Coach = { id: string; name: string };
 
 type Task = {
   id: string;
   release_id: string;
   description: string;
   assigned_to: Assignee;
+  assigned_coach_id: string | null;
   phase_group: string;
   phase_label: string;
   week_title: string;
@@ -110,11 +113,15 @@ export function ReleasesView({
   today,
   production,
   templates,
+  coaches,
+  artistName,
 }: {
   releases: Release[];
   today: string;
   production: Record<string, ProductionState>;
   templates: TemplatesProp;
+  coaches: Coach[];
+  artistName: string;
 }) {
   const [adding, setAdding] = useState(false);
   const [showPast, setShowPast] = useState(false);
@@ -173,6 +180,8 @@ export function ReleasesView({
                 today={today}
                 production={production[r.id]}
                 siblings={siblings}
+                coaches={coaches}
+                artistName={artistName}
               />
             ))}
             {active.length === 0 && (
@@ -200,6 +209,8 @@ export function ReleasesView({
                       today={today}
                       production={production[r.id]}
                       siblings={siblings}
+                      coaches={coaches}
+                      artistName={artistName}
                     />
                   ))}
                 </div>
@@ -290,11 +301,15 @@ function ReleaseCard({
   today,
   production,
   siblings,
+  coaches,
+  artistName,
 }: {
   release: Release;
   today: string;
   production?: ProductionState;
   siblings: ReleaseLite[];
+  coaches: Coach[];
+  artistName: string;
 }) {
   const [open, setOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -355,7 +370,13 @@ function ReleaseCard({
       </button>
 
       {open && (
-        <ReleaseDetail release={release} siblings={siblings} today={today} />
+        <ReleaseDetail
+          release={release}
+          siblings={siblings}
+          today={today}
+          coaches={coaches}
+          artistName={artistName}
+        />
       )}
       {confirmDelete && (
         <DeleteReleaseModal
@@ -439,10 +460,14 @@ function ReleaseDetail({
   release,
   siblings,
   today,
+  coaches,
+  artistName,
 }: {
   release: Release;
   siblings: ReleaseLite[];
   today: string;
+  coaches: Coach[];
+  artistName: string;
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -665,7 +690,13 @@ function ReleaseDetail({
             </div>
             <div className="mt-2 space-y-0.5">
               {phase.tasks.map((t) => (
-                <ReleaseTaskRow key={t.id} task={t} onRun={run} />
+                <ReleaseTaskRow
+                  key={t.id}
+                  task={t}
+                  onRun={run}
+                  coaches={coaches}
+                  artistName={artistName}
+                />
               ))}
             </div>
             {addingPhase === i ? (
@@ -851,9 +882,13 @@ const ASSIGNEE_LABEL: Record<Assignee, string | null> = {
 function ReleaseTaskRow({
   task,
   onRun,
+  coaches,
+  artistName,
 }: {
   task: Task;
   onRun: (fn: () => Promise<void>) => void;
+  coaches: Coach[];
+  artistName: string;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(task.description);
@@ -927,6 +962,18 @@ function ReleaseTaskRow({
         </p>
       )}
 
+      {/* Assign to the artist or a coach — only shown when the artist has coaches */}
+      {coaches.length > 0 && (
+        <AssigneeControl
+          current={task.assigned_coach_id}
+          coaches={coaches}
+          artistName={artistName}
+          onAssign={(coachId) =>
+            onRun(() => setReleaseTaskAssignee(task.id, coachId))
+          }
+        />
+      )}
+
       <button
         onClick={() => onRun(() => deleteReleaseTask(task.id))}
         aria-label="Delete task"
@@ -935,6 +982,85 @@ function ReleaseTaskRow({
         <X size={15} />
       </button>
     </div>
+  );
+}
+
+// A compact chip showing a release task's assignee (artist or coach), with a
+// dropdown to reassign. Only rendered when the artist has at least one coach.
+function AssigneeControl({
+  current,
+  coaches,
+  artistName,
+  onAssign,
+}: {
+  current: string | null;
+  coaches: Coach[];
+  artistName: string;
+  onAssign: (coachId: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const label = current
+    ? (coaches.find((c) => c.id === current)?.name ?? "Coach")
+    : artistName;
+  const first = label.split(" ")[0];
+  return (
+    <div className="relative mt-0.5 shrink-0">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="rounded-full bg-surface-primary px-2 py-0.5 text-[10px] font-medium text-ink-soft ring-1 ring-line transition-colors hover:text-ink"
+      >
+        {first}
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-6 z-50 w-40 overflow-hidden rounded-xl border border-line bg-surface-primary py-1 shadow-lg">
+            <AssigneeOpt
+              active={!current}
+              onClick={() => {
+                setOpen(false);
+                onAssign(null);
+              }}
+            >
+              {artistName}
+            </AssigneeOpt>
+            {coaches.map((c) => (
+              <AssigneeOpt
+                key={c.id}
+                active={current === c.id}
+                onClick={() => {
+                  setOpen(false);
+                  onAssign(c.id);
+                }}
+              >
+                {c.name}
+              </AssigneeOpt>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function AssigneeOpt({
+  children,
+  active,
+  onClick,
+}: {
+  children: React.ReactNode;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`block w-full px-3 py-2 text-left text-sm transition-colors hover:bg-surface-secondary ${
+        active ? "font-medium text-ink" : "text-ink-soft"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 
