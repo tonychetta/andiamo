@@ -306,12 +306,21 @@ function MilestoneStack({ goal }: { goal: Goal }) {
     });
   }
 
-  if (goal.milestones.length === 0) {
+  // No ACTIVE milestone (none yet, or every one is completed) → show the
+  // generate state instead of trying to render an undefined "Next" card.
+  if (!next) {
+    const allDone = goal.milestones.length > 0;
     return (
       <div className="mt-8 rounded-2xl border border-dashed border-line p-8 text-center">
-        <p className="text-ink">No Milestones yet for this Goal.</p>
+        <p className="text-ink">
+          {allDone
+            ? "You've completed every Milestone for this Goal. 🎉"
+            : "No Milestones yet for this Goal."}
+        </p>
         <p className="mt-1 text-sm text-ink-soft">
-          Andiamo will map 5 stepping-stones from where you are now to this Goal.
+          {allDone
+            ? "Generate a fresh set to keep pushing this Goal forward."
+            : "Andiamo will map 5 stepping-stones from where you are now to this Goal."}
         </p>
         <button
           onClick={generate}
@@ -323,7 +332,11 @@ function MilestoneStack({ goal }: { goal: Goal }) {
             weight="fill"
             className={`text-accent-gold ${generating ? "animate-twinkle" : ""}`}
           />
-          {generating ? "Mapping your path…" : "Generate Milestones"}
+          {generating
+            ? "Mapping your path…"
+            : allDone
+              ? "Generate New Milestones"
+              : "Generate Milestones"}
         </button>
         {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
       </div>
