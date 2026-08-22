@@ -75,7 +75,12 @@ export async function POST(request: Request) {
   );
   if (linkErr) {
     console.error("instagram import link error", linkErr);
-    return Response.json({ error: "Couldn't save the metrics." }, { status: 500 });
+    // Surface the underlying reason — a bare "couldn't save" leaves nothing to
+    // act on, and these are the artist's own rows.
+    return Response.json(
+      { error: `Couldn't save the metrics: ${linkErr.message}` },
+      { status: 500 },
+    );
   }
 
   return Response.json({ ok: true, pieceId: targetPiece, date: postedDate });
