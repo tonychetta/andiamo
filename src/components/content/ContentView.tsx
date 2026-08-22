@@ -220,12 +220,15 @@ export function ContentView({
   }
   const hasReleases = releaseDates.length > 0;
 
-  // Center on today when the page opens and whenever the view is toggled.
+  // Center on today when the page opens, when the view is toggled, and when
+  // coming back from the Dashboard — switching modes unmounts the calendar, so
+  // it remounts scrolled to the top and has to be re-centered.
   useEffect(() => {
+    if (mode !== "calendar") return;
     const t = setTimeout(() => scrollToDate(today, false), 30);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view]);
+  }, [view, mode]);
 
   return (
     <section className="flex h-[calc(100dvh-11rem)] flex-col">
