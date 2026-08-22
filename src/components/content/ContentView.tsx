@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CaretLeft, CaretRight, X, Plus, Trash } from "@phosphor-icons/react";
+import { CaretLeft, CaretRight, X, Plus, Trash, Check } from "@phosphor-icons/react";
 import {
   createContentType,
   addSong,
@@ -139,6 +139,12 @@ export function ContentView({
   // A just-imported piece to open for tagging once it lands in props.
   const [pendingOpenId, setPendingOpenId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // A post pulled from a platform that still needs its song / content type.
+  // These collapse into a single "+N" badge instead of a row of blank pills.
+  const isUntaggedImport = (p: Piece) =>
+    p.links.some((l) => l.external_post_id) &&
+    (p.typeIds.length === 0 || !p.song_id);
 
   function moveTo(id: string, date: string) {
     moveContentPiece(id, date).then(() => router.refresh());
@@ -334,6 +340,8 @@ export function ContentView({
                       const isToday = d.date === today;
                       const releaseTitle = releaseByDate.get(d.date);
                       const dayPieces = piecesByDate.get(d.date) ?? [];
+                      const untagged = dayPieces.filter(isUntaggedImport);
+                      const tagged = dayPieces.filter((x) => !isUntaggedImport(x));
                       return (
                         <button
                           key={d.date}
@@ -361,7 +369,22 @@ export function ContentView({
                             </span>
                           )}
                           <div className="mt-0.5 space-y-0.5">
-                            {dayPieces.slice(0, 3).map((p) => {
+                            {untagged.length > 0 && (
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditing({
+                                    piece: untagged[0],
+                                    date: d.date,
+                                  });
+                                }}
+                                className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-dashed border-accent-cyan bg-accent-cyan/15 text-[10px] font-semibold text-ink"
+                                title={`${untagged.length} pulled post${untagged.length > 1 ? "s" : ""} to tag`}
+                              >
+                                +{untagged.length}
+                              </span>
+                            )}
+                            {tagged.slice(0, 3).map((p) => {
                               const t = p.typeIds
                                 .map((id) => typeById.get(id))
                                 .filter(Boolean)[0] as ContentType | undefined;
@@ -392,9 +415,9 @@ export function ContentView({
                                 </ContentPill>
                               );
                             })}
-                            {dayPieces.length > 3 && (
+                            {tagged.length > 3 && (
                               <span className="block px-1 text-[9px] text-ink-soft">
-                                +{dayPieces.length - 3} more
+                                +{tagged.length - 3} more
                               </span>
                             )}
                           </div>
@@ -415,6 +438,8 @@ export function ContentView({
                     const isToday = d.date === today;
                     const releaseTitle = releaseByDate.get(d.date);
                     const dayPieces = piecesByDate.get(d.date) ?? [];
+                    const untagged = dayPieces.filter(isUntaggedImport);
+                    const tagged = dayPieces.filter((x) => !isUntaggedImport(x));
                     return (
                       <button
                         key={d.date}
@@ -448,8 +473,23 @@ export function ContentView({
                             </div>
                           )}
                           {dayPieces.length > 0 ? (
-                            <div className="flex flex-wrap gap-1.5">
-                              {dayPieces.map((p) => {
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {untagged.length > 0 && (
+                                <span
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditing({
+                                      piece: untagged[0],
+                                      date: d.date,
+                                    });
+                                  }}
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-accent-cyan bg-accent-cyan/15 text-xs font-semibold text-ink"
+                                  title={`${untagged.length} pulled post${untagged.length > 1 ? "s" : ""} to tag`}
+                                >
+                                  +{untagged.length}
+                                </span>
+                              )}
+                              {tagged.map((p) => {
                                 const t = p.typeIds
                                   .map((id) => typeById.get(id))
                                   .filter(Boolean)[0] as ContentType | undefined;
@@ -829,6 +869,41 @@ function ContentLightbox({
         <p className="px-6 pt-1 text-sm text-ink-soft">{fmtLong(scheduledDate)}</p>
 
         <div className="mt-4 flex-1 space-y-5 overflow-y-auto overscroll-contain px-6 pb-4">
+          {/* Preview of the pulled-in post — what am I tagging? */}
+          {(() => {
+            const src = links.find((l) => l.thumbnail_url);
+            if (!src) return null;
+            return (
+              <div className="flex gap-3 rounded-xl bg-surface-secondary p-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={src.thumbnail_url as string}
+                  alt=""
+                  className="h-24 w-24 shrink-0 rounded-lg object-cover"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] uppercase tracking-wide text-ink-soft">
+                    From {src.platform || "platform"}
+                  </p>
+                  <p className="mt-1 line-clamp-4 text-xs leading-snug text-ink">
+                    {src.caption || "No caption"}
+                  </p>
+                  {src.url && (
+                    <a
+                      href={src.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="mt-1 inline-block text-[11px] text-ink-soft underline underline-offset-2"
+                    >
+                      Open post
+                    </a>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Date */}
           <div>
             <label className="text-xs uppercase tracking-wide text-ink-soft">
@@ -1005,6 +1080,11 @@ function ContentLightbox({
                     </div>
                   )}
                   <div className="flex items-center gap-2">
+                    {l.external_post_id ? (
+                      <span className="min-w-0 flex-1 text-sm font-medium text-ink">
+                        {l.platform}
+                      </span>
+                    ) : (
                     <select
                       value={l.platform}
                       onChange={(e) => setLink(i, { platform: e.target.value })}
@@ -1020,6 +1100,7 @@ function ContentLightbox({
                         </option>
                       ))}
                     </select>
+                    )}
                     <button
                       onClick={() =>
                         setLinks((ls) => ls.filter((_, j) => j !== i))
@@ -1030,12 +1111,14 @@ function ContentLightbox({
                       <Trash size={16} />
                     </button>
                   </div>
-                  <input
-                    value={l.url}
-                    onChange={(e) => setLink(i, { url: e.target.value })}
-                    placeholder="Link URL"
-                    className="mt-2 w-full min-w-0 rounded-lg border border-line bg-surface-primary px-2.5 py-1.5 text-sm text-ink outline-none focus:border-ink"
-                  />
+                  {!l.external_post_id && (
+                    <input
+                      value={l.url}
+                      onChange={(e) => setLink(i, { url: e.target.value })}
+                      placeholder="Link URL"
+                      className="mt-2 w-full min-w-0 rounded-lg border border-line bg-surface-primary px-2.5 py-1.5 text-sm text-ink outline-none focus:border-ink"
+                    />
+                  )}
                   <div className="mt-2 grid grid-cols-5 gap-1.5">
                     {(
                       ["views", "likes", "comments", "shares", "saves"] as const
@@ -1071,16 +1154,30 @@ function ContentLightbox({
                     const already = links.some(
                       (l) => l.platform === ap.label && l.external_post_id,
                     );
-                    if (already) return null;
                     return (
                       <button
                         key={ap.label}
-                        disabled={!ap.live}
+                        disabled={!ap.live || already}
                         onClick={() => onAddPlatform(ap.id)}
-                        title={ap.live ? undefined : "Coming soon"}
-                        className="inline-flex items-center gap-1 rounded-lg border border-line px-2.5 py-1.5 text-xs text-ink transition-colors hover:bg-surface-primary disabled:opacity-40"
+                        title={
+                          already
+                            ? `${ap.label} post attached`
+                            : ap.live
+                              ? undefined
+                              : "Coming soon"
+                        }
+                        className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs transition-colors ${
+                          already
+                            ? "border-accent-cyan bg-accent-cyan/15 text-ink"
+                            : "border-line text-ink hover:bg-surface-primary disabled:opacity-40"
+                        }`}
                       >
-                        <Plus size={13} /> Add {ap.label}
+                        {already ? (
+                          <Check size={13} weight="bold" />
+                        ) : (
+                          <Plus size={13} />
+                        )}{" "}
+                        {ap.label}
                       </button>
                     );
                   })}
