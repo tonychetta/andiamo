@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 // RLS guarantees every mutation here only touches the signed-in artist's rows.
 
@@ -9,6 +10,27 @@ async function artistId() {
   const supabase = await createClient();
   const { data } = await supabase.rpc("current_artist_id");
   return { supabase, artistId: data as string | null };
+}
+
+// Disconnect a linked social account. Only the artist themselves may do this
+// (same rule as connecting). social_accounts is server-only, so we use admin.
+export async function disconnectSocialAccount(platform: string) {
+  const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  const uid = claims?.claims?.sub;
+  if (!uid) return;
+  const { data: own } = await supabase
+    .from("artists")
+    .select("id")
+    .eq("user_id", uid)
+    .maybeSingle();
+  if (!own) return;
+  await createAdminClient()
+    .from("social_accounts")
+    .delete()
+    .eq("artist_id", own.id)
+    .eq("platform", platform);
+  revalidatePath("/content");
 }
 
 // Auto-color palette for Content Type tags (distinct, readable on cream).

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CaretLeft, CaretRight, X, Plus, Trash } from "@phosphor-icons/react";
 import {
@@ -12,6 +12,7 @@ import {
   type LinkInput,
 } from "@/app/(app)/content/actions";
 import { PerformanceDashboard } from "./PerformanceDashboard";
+import { SyncPanel, type Connection } from "./SyncPanel";
 
 type ContentType = { id: string; name: string; color: string };
 type Song = { id: string; title: string; original_release_date?: string | null };
@@ -113,12 +114,14 @@ export function ContentView({
   songs: songsProp,
   contentTypes: typesProp,
   pieces,
+  connections = [],
 }: {
   today: string;
   releaseDates: ReleaseDate[];
   songs: Song[];
   contentTypes: ContentType[];
   pieces: Piece[];
+  connections?: Connection[];
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState<{ piece?: Piece; date: string } | null>(
@@ -226,7 +229,12 @@ export function ContentView({
 
   return (
     <section className="flex h-[calc(100dvh-11rem)] flex-col">
-      <h1 className="font-serif text-3xl leading-tight text-ink">Content</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="font-serif text-3xl leading-tight text-ink">Content</h1>
+        <Suspense fallback={null}>
+          <SyncPanel connections={connections} />
+        </Suspense>
+      </div>
 
       {mode === "dashboard" && (
         <PerformanceDashboard

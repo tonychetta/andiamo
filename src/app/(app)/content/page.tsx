@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { ContentView } from "@/components/content/ContentView";
 
 export default async function ContentPage() {
@@ -54,6 +55,19 @@ export default async function ContentPage() {
 
   const today = new Date().toISOString().slice(0, 10);
 
+  // Connected platforms. social_accounts is server-only (RLS on, no policies),
+  // so we read it with the admin client and pass down ONLY safe fields — never
+  // the access token.
+  const { data: aid } = await supabase.rpc("current_artist_id");
+  let connections: { platform: string; username: string | null }[] = [];
+  if (aid) {
+    const { data: accounts } = await createAdminClient()
+      .from("social_accounts")
+      .select("platform, username")
+      .eq("artist_id", aid as string);
+    connections = accounts ?? [];
+  }
+
   return (
     <ContentView
       today={today}
@@ -67,6 +81,7 @@ export default async function ContentPage() {
       songs={songs ?? []}
       contentTypes={contentTypes ?? []}
       pieces={piecesData}
+      connections={connections}
     />
   );
 }

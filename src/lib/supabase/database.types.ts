@@ -793,6 +793,48 @@ export type Database = {
           },
         ]
       }
+      social_accounts: {
+        Row: {
+          access_token: string
+          artist_id: string
+          connected_at: string
+          external_user_id: string
+          id: string
+          last_synced_at: string | null
+          platform: string
+          scopes: string | null
+          token_expires_at: string | null
+          updated_at: string
+          username: string | null
+        }
+        Insert: {
+          access_token: string
+          artist_id: string
+          connected_at?: string
+          external_user_id: string
+          id?: string
+          last_synced_at?: string | null
+          platform: string
+          scopes?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          username?: string | null
+        }
+        Update: {
+          access_token?: string
+          artist_id?: string
+          connected_at?: string
+          external_user_id?: string
+          id?: string
+          last_synced_at?: string | null
+          platform?: string
+          scopes?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
       songs: {
         Row: {
           artist_id: string
