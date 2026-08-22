@@ -185,6 +185,10 @@ export type Database = {
       }
       content_links: {
         Row: {
+          caption: string | null
+          external_post_id: string | null
+          posted_at: string | null
+          thumbnail_url: string | null
           artist_id: string
           comments: number | null
           content_piece_id: string
@@ -199,6 +203,10 @@ export type Database = {
           views: number | null
         }
         Insert: {
+          caption?: string | null
+          external_post_id?: string | null
+          posted_at?: string | null
+          thumbnail_url?: string | null
           artist_id: string
           comments?: number | null
           content_piece_id: string
@@ -213,6 +221,10 @@ export type Database = {
           views?: number | null
         }
         Update: {
+          caption?: string | null
+          external_post_id?: string | null
+          posted_at?: string | null
+          thumbnail_url?: string | null
           artist_id?: string
           comments?: number | null
           content_piece_id?: string

@@ -92,6 +92,12 @@ export type LinkInput = {
   comments: number | null;
   shares: number | null;
   saves: number | null;
+  // Source metadata for links pulled in from a platform. Carried through the
+  // replace-all save below so re-saving a piece doesn't strip the import.
+  externalPostId?: string | null;
+  thumbnailUrl?: string | null;
+  caption?: string | null;
+  postedAt?: string | null;
 };
 
 export async function saveContentPiece(input: {
@@ -168,6 +174,10 @@ export async function saveContentPiece(input: {
         comments: l.comments,
         shares: l.shares,
         saves: l.saves,
+        external_post_id: l.externalPostId ?? null,
+        thumbnail_url: l.thumbnailUrl ?? null,
+        caption: l.caption ?? null,
+        posted_at: l.postedAt ?? null,
       })),
     );
   }

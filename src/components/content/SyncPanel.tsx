@@ -8,7 +8,6 @@ import {
   TiktokLogo,
   FacebookLogo,
   YoutubeLogo,
-  CheckCircle,
   ArrowsClockwise,
 } from "@phosphor-icons/react";
 import { disconnectSocialAccount } from "@/app/(app)/content/actions";
@@ -42,7 +41,13 @@ const PLATFORMS = [
   },
 ] as const;
 
-export function SyncPanel({ connections }: { connections: Connection[] }) {
+export function SyncPanel({
+  connections,
+  onBrowse,
+}: {
+  connections: Connection[];
+  onBrowse: (platform: string) => void;
+}) {
   const router = useRouter();
   const params = useSearchParams();
   const [open, setOpen] = useState(false);
@@ -156,11 +161,15 @@ export function SyncPanel({ connections }: { connections: Connection[] }) {
                       <span className="shrink-0 text-xs text-ink-soft/60">Soon</span>
                     ) : conn ? (
                       <div className="flex shrink-0 items-center gap-2">
-                        <CheckCircle
-                          size={20}
-                          weight="fill"
-                          className="text-accent-cyan"
-                        />
+                        <button
+                          onClick={() => {
+                            setOpen(false);
+                            onBrowse(id);
+                          }}
+                          className="rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-surface-primary"
+                        >
+                          Pull posts
+                        </button>
                         <button
                           onClick={() => disconnect(id)}
                           disabled={pending}

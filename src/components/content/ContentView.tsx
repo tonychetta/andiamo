@@ -13,6 +13,7 @@ import {
 } from "@/app/(app)/content/actions";
 import { PerformanceDashboard } from "./PerformanceDashboard";
 import { SyncPanel, type Connection } from "./SyncPanel";
+import { InstagramGrid } from "./InstagramGrid";
 
 type ContentType = { id: string; name: string; color: string };
 type Song = { id: string; title: string; original_release_date?: string | null };
@@ -26,6 +27,10 @@ type LinkData = {
   shares: number | null;
   saves: number | null;
   updated_at?: string;
+  external_post_id?: string | null;
+  thumbnail_url?: string | null;
+  caption?: string | null;
+  posted_at?: string | null;
 };
 type Piece = {
   id: string;
@@ -129,6 +134,10 @@ export function ContentView({
   );
   const [view, setView] = useState<"monthly" | "weekly">("weekly");
   const [mode, setMode] = useState<"calendar" | "dashboard">("calendar");
+  // Which platform picker is open, and (for "+ Add") which piece to attach to.
+  const [browsing, setBrowsing] = useState<{ platform: string; pieceId?: string } | null>(null);
+  // A just-imported piece to open for tagging once it lands in props.
+  const [pendingOpenId, setPendingOpenId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   function moveTo(id: string, date: string) {
@@ -220,6 +229,17 @@ export function ContentView({
   }
   const hasReleases = releaseDates.length > 0;
 
+  // An imported post only exists in props after the refresh lands, so wait for
+  // it to appear, then open it for tagging.
+  useEffect(() => {
+    if (!pendingOpenId) return;
+    const piece = pieces.find((p) => p.id === pendingOpenId);
+    if (piece) {
+      setEditing({ piece, date: piece.scheduled_date });
+      setPendingOpenId(null);
+    }
+  }, [pendingOpenId, pieces]);
+
   // Center on today when the page opens, when the view is toggled, and when
   // coming back from the Dashboard — switching modes unmounts the calendar, so
   // it remounts scrolled to the top and has to be re-centered.
@@ -235,7 +255,10 @@ export function ContentView({
       <div className="flex items-center justify-between gap-3">
         <h1 className="font-serif text-3xl leading-tight text-ink">Content</h1>
         <Suspense fallback={null}>
-          <SyncPanel connections={connections} />
+          <SyncPanel
+            connections={connections}
+            onBrowse={(platform) => setBrowsing({ platform })}
+          />
         </Suspense>
       </div>
 
@@ -503,6 +526,27 @@ export function ContentView({
             // Return to the day we were just planning.
             setTimeout(() => scrollToDate(date, false), 60);
           }}
+          onAddPlatform={(platform) => {
+            if (editing.piece) {
+              setBrowsing({ platform, pieceId: editing.piece.id });
+              setEditing(null);
+            }
+          }}
+        />
+      )}
+
+      {browsing?.platform === "instagram" && (
+        <InstagramGrid
+          pieceId={browsing.pieceId}
+          onClose={() => setBrowsing(null)}
+          onImported={(pieceId, date) => {
+            setBrowsing(null);
+            // Land on the day it was actually posted, then open it for tagging
+            // once the refreshed data arrives.
+            setPendingOpenId(pieceId);
+            router.refresh();
+            setTimeout(() => scrollToDate(date, false), 80);
+          }}
         />
       )}
     </section>
@@ -637,6 +681,13 @@ const EMPTY_LINK: LinkData = {
 };
 
 const PLATFORM_OPTIONS = ["Instagram", "TikTok", "YouTube Shorts", "Facebook"];
+// One creative, one pill — attach each platform's post to the same piece.
+const ATTACH_PLATFORMS = [
+  { id: "instagram", label: "Instagram", live: true },
+  { id: "tiktok", label: "TikTok", live: false },
+  { id: "facebook", label: "Facebook", live: false },
+  { id: "youtube", label: "YouTube Shorts", live: false },
+] as const;
 
 function ContentLightbox({
   piece,
@@ -645,6 +696,7 @@ function ContentLightbox({
   contentTypes: typesProp,
   onClose,
   onSaved,
+  onAddPlatform,
 }: {
   piece?: Piece;
   date: string;
@@ -652,6 +704,7 @@ function ContentLightbox({
   contentTypes: ContentType[];
   onClose: () => void;
   onSaved: (date: string) => void;
+  onAddPlatform: (platform: string) => void;
 }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -722,6 +775,10 @@ function ContentLightbox({
       comments: l.comments,
       shares: l.shares,
       saves: l.saves,
+      externalPostId: l.external_post_id ?? null,
+      thumbnailUrl: l.thumbnail_url ?? null,
+      caption: l.caption ?? null,
+      postedAt: l.posted_at ?? null,
     }));
     Promise.resolve(
       saveContentPiece({
@@ -929,6 +986,24 @@ function ContentLightbox({
                   key={i}
                   className="rounded-xl border border-line bg-surface-secondary p-3"
                 >
+                  {l.thumbnail_url && (
+                    <div className="mb-2.5 flex gap-2.5">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={l.thumbnail_url}
+                        alt=""
+                        className="h-16 w-16 shrink-0 rounded-lg object-cover"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] uppercase tracking-wide text-ink-soft">
+                          Pulled from {l.platform || "platform"}
+                        </p>
+                        <p className="mt-0.5 line-clamp-3 text-xs leading-snug text-ink">
+                          {l.caption || "No caption"}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex items-center gap-2">
                     <select
                       value={l.platform}
@@ -988,6 +1063,29 @@ function ContentLightbox({
                   </div>
                 </div>
               ))}
+              {/* Attach the same creative's post on each platform. Saves first
+                  so nothing typed above is lost when the picker takes over. */}
+              {piece?.id && (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {ATTACH_PLATFORMS.map((ap) => {
+                    const already = links.some(
+                      (l) => l.platform === ap.label && l.external_post_id,
+                    );
+                    if (already) return null;
+                    return (
+                      <button
+                        key={ap.label}
+                        disabled={!ap.live}
+                        onClick={() => onAddPlatform(ap.id)}
+                        title={ap.live ? undefined : "Coming soon"}
+                        className="inline-flex items-center gap-1 rounded-lg border border-line px-2.5 py-1.5 text-xs text-ink transition-colors hover:bg-surface-primary disabled:opacity-40"
+                      >
+                        <Plus size={13} /> Add {ap.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
               <button
                 onClick={() => setLinks((ls) => [...ls, { ...EMPTY_LINK }])}
                 className="inline-flex items-center gap-1.5 text-sm text-ink-soft transition-colors hover:text-ink"

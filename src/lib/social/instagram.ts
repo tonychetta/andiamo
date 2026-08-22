@@ -205,6 +205,40 @@ export async function fetchMedia(
   }
 }
 
+// A single post by id — re-fetched server-side rather than trusting whatever
+// the browser sends us at import time.
+export async function fetchMediaById(
+  token: string,
+  mediaId: string,
+): Promise<IgMedia | null> {
+  const p = new URLSearchParams({
+    fields: "id,caption,media_type,media_url,thumbnail_url,permalink,timestamp",
+    access_token: token,
+  });
+  try {
+    const res = await fetch(
+      `${GRAPH}/${encodeURIComponent(mediaId)}?${p.toString()}`,
+      { cache: "no-store" },
+    );
+    const m = await res.json();
+    if (!res.ok) {
+      console.error("instagram fetchMediaById failed", res.status, m);
+      return null;
+    }
+    return {
+      id: m.id,
+      caption: m.caption ?? "",
+      mediaType: m.media_type ?? "",
+      thumbnailUrl: m.thumbnail_url || m.media_url || "",
+      permalink: m.permalink ?? "",
+      timestamp: m.timestamp ?? "",
+    };
+  } catch (err) {
+    console.error("instagram fetchMediaById error", err);
+    return null;
+  }
+}
+
 export type IgMetrics = {
   views: number | null;
   likes: number | null;
