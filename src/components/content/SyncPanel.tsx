@@ -80,6 +80,35 @@ export function SyncPanel({
     router.replace("/content");
   }, [params, router]);
 
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Re-pull the numbers for posts already imported (metrics keep moving after
+  // import day). The nightly job does this too; this is the "now" button.
+  async function refreshMetrics() {
+    setRefreshing(true);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/instagram/refresh", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setNotice({
+        kind: "ok",
+        text:
+          data.updated > 0
+            ? `Refreshed ${data.updated} post${data.updated === 1 ? "" : "s"}.`
+            : "Nothing to refresh yet — pull in some posts first.",
+      });
+      router.refresh();
+    } catch (e) {
+      setNotice({
+        kind: "err",
+        text: e instanceof Error ? e.message : "Couldn't refresh metrics.",
+      });
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   function disconnect(platform: string) {
     startTransition(async () => {
       await disconnectSocialAccount(platform);
@@ -191,10 +220,21 @@ export function SyncPanel({
               })}
             </div>
 
+            {connections.length > 0 && (
+              <button
+                onClick={refreshMetrics}
+                disabled={refreshing}
+                className="mt-3 w-full rounded-xl border border-line py-2.5 text-sm text-ink transition-colors hover:bg-surface-secondary disabled:opacity-50"
+              >
+                {refreshing ? "Refreshing…" : "Refresh metrics now"}
+              </button>
+            )}
+
             <p className="mt-4 text-xs leading-relaxed text-ink-soft">
-              Your Instagram must be a Professional (Business or Creator)
-              account — it&apos;s a free switch in Instagram&apos;s settings. We only
-              read your posts and their insights.
+              Metrics refresh automatically each night. Your Instagram must be a
+              Professional (Business or Creator)
+              account — it&apos;s a free switch in Instagram&apos;s settings. We
+              only read your posts and their insights.
             </p>
           </div>
         </div>

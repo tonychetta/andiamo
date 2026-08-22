@@ -1,14 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { refreshLongLivedToken } from "@/lib/social/instagram";
+import { refreshInstagramMetrics } from "@/lib/social/refresh";
 
 export const runtime = "nodejs";
 
 /*
-  Nightly job: keep Instagram tokens alive. Long-lived tokens last ~60 days and
-  can be refreshed any time after their first 24 hours, so we top up anything
-  expiring within 20 days. Without this, a connection silently dies after 60
-  days and the artist would have to reconnect.
+  Nightly job, two parts:
+   1. Keep tokens alive. Long-lived tokens last ~60 days and can be refreshed
+      after their first 24 hours, so we top up anything expiring within 20 days.
+      Without this a connection silently dies and the artist must reconnect.
+   2. Re-pull metrics for imported posts, so the dashboard reflects how content
+      actually performed rather than its numbers on import day.
 
   Protected by CRON_SECRET (Vercel sends it as a Bearer token on scheduled runs).
 */
@@ -22,37 +25,65 @@ export async function GET(request: NextRequest) {
   }
 
   const admin = createAdminClient();
-  const cutoff = new Date(Date.now() + 20 * 86_400_000).toISOString();
   const { data: accounts, error } = await admin
     .from("social_accounts")
-    .select("id, access_token, token_expires_at")
-    .eq("platform", "instagram")
-    .or(`token_expires_at.is.null,token_expires_at.lte.${cutoff}`);
+    .select("id, artist_id, access_token, token_expires_at")
+    .eq("platform", "instagram");
   if (error) {
     console.error("instagram refresh query error", error);
     return NextResponse.json({ error: "Query failed." }, { status: 500 });
   }
 
-  let refreshed = 0;
-  let failed = 0;
+  const cutoff = Date.now() + 20 * 86_400_000;
+  let tokensRefreshed = 0;
+  let tokenFailures = 0;
+  let metricsUpdated = 0;
+  let metricFailures = 0;
+
   for (const acct of accounts ?? []) {
-    const next = await refreshLongLivedToken(acct.access_token);
-    if (!next) {
-      // Usually means the artist revoked access — leave the row so the UI can
-      // still show it as connected-but-broken and prompt a reconnect.
-      failed++;
-      continue;
+    let token = acct.access_token;
+
+    // Top up the token first, so the metrics pull below uses a fresh one.
+    const expiring =
+      !acct.token_expires_at || Date.parse(acct.token_expires_at) <= cutoff;
+    if (expiring) {
+      const next = await refreshLongLivedToken(token);
+      if (next) {
+        const { error: upErr } = await admin
+          .from("social_accounts")
+          .update({
+            access_token: next.accessToken,
+            token_expires_at: next.expiresAt,
+          })
+          .eq("id", acct.id);
+        if (upErr) {
+          tokenFailures++;
+        } else {
+          token = next.accessToken;
+          tokensRefreshed++;
+        }
+      } else {
+        // Usually means the artist revoked access — leave the row so the UI can
+        // still show it as connected-but-broken and prompt a reconnect.
+        tokenFailures++;
+        continue;
+      }
     }
-    const { error: upErr } = await admin
+
+    const r = await refreshInstagramMetrics(admin, acct.artist_id, token);
+    metricsUpdated += r.updated;
+    metricFailures += r.failed;
+    await admin
       .from("social_accounts")
-      .update({
-        access_token: next.accessToken,
-        token_expires_at: next.expiresAt,
-      })
+      .update({ last_synced_at: new Date().toISOString() })
       .eq("id", acct.id);
-    if (upErr) failed++;
-    else refreshed++;
   }
 
-  return NextResponse.json({ ok: true, refreshed, failed });
+  return NextResponse.json({
+    ok: true,
+    tokensRefreshed,
+    tokenFailures,
+    metricsUpdated,
+    metricFailures,
+  });
 }
