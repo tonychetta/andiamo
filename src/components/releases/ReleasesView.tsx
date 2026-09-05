@@ -474,7 +474,6 @@ function ReleaseDetail({
   const [addingPhase, setAddingPhase] = useState<number | null>(null);
   const [showPast, setShowPast] = useState(false);
   const [taskDraft, setTaskDraft] = useState("");
-  const [editingDate, setEditingDate] = useState(false);
   const [dateDraft, setDateDraft] = useState(release.release_date ?? "");
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(release.title);
@@ -583,6 +582,20 @@ function ReleaseDetail({
             placeholder="Notes (optional)"
             className="mt-2 w-full resize-none rounded-lg border border-line bg-surface-secondary px-3 py-2 text-sm text-ink outline-none focus:border-ink"
           />
+          <label className="mt-3 block text-xs uppercase tracking-wide text-ink-soft">
+            Release date
+          </label>
+          <input
+            type="date"
+            value={dateDraft}
+            onChange={(e) => setDateDraft(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-line bg-surface-secondary px-3 py-2 text-ink outline-none focus:border-ink"
+          />
+          <p className="mt-1 text-xs text-ink-soft">
+            {release.release_date
+              ? "Moving this shifts every task in the schedule to match."
+              : "Setting this fills in the whole schedule from it."}
+          </p>
           {release.release_type === "single" && (
             <>
               <input
@@ -603,6 +616,7 @@ function ReleaseDetail({
                 setTitleDraft(release.title);
                 setNotesDraft(release.notes ?? "");
                 setMgmtDraft(release.mgmt_link ?? "");
+                setDateDraft(release.release_date ?? "");
                 setEditingTitle(false);
               }}
               className="rounded-lg px-3 py-1.5 text-sm text-ink-soft"
@@ -612,13 +626,17 @@ function ReleaseDetail({
             <button
               onClick={() => {
                 setEditingTitle(false);
-                run(() =>
-                  updateReleaseDetails(release.id, {
+                run(async () => {
+                  await updateReleaseDetails(release.id, {
                     title: titleDraft,
                     notes: notesDraft,
                     mgmtLink: mgmtDraft,
-                  }),
-                );
+                  });
+                  // Date last: it recomputes every task's due date from its offset.
+                  if (dateDraft && dateDraft !== release.release_date) {
+                    await changeReleaseDate(release.id, dateDraft);
+                  }
+                });
               }}
               className="rounded-lg bg-ink px-3 py-1.5 text-sm text-surface-primary"
             >
@@ -822,52 +840,6 @@ function ReleaseDetail({
         </div>
       )}
 
-      {/* Footer actions */}
-      <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-line pt-4">
-        {editingDate ? (
-          <div className="flex w-full flex-col gap-2 rounded-xl border border-line bg-surface-primary p-3">
-            <p className="text-sm text-ink">
-              {release.release_date
-                ? "Move the release date — every task shifts to match."
-                : "Set the release date — the whole schedule fills in from it."}
-            </p>
-            <input
-              type="date"
-              value={dateDraft}
-              onChange={(e) => setDateDraft(e.target.value)}
-              className="rounded-lg border border-line bg-surface-secondary px-3 py-2 text-ink outline-none focus:border-ink"
-            />
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => {
-                  setDateDraft(release.release_date ?? "");
-                  setEditingDate(false);
-                }}
-                className="rounded-lg px-3 py-1.5 text-sm text-ink-soft"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  setEditingDate(false);
-                  if (dateDraft && dateDraft !== release.release_date)
-                    run(() => changeReleaseDate(release.id, dateDraft));
-                }}
-                className="rounded-lg bg-ink px-3 py-1.5 text-sm text-surface-primary"
-              >
-                {release.release_date ? "Shift dates" : "Set date"}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button
-            onClick={() => setEditingDate(true)}
-            className="text-sm text-ink-soft transition-colors hover:text-ink"
-          >
-            {release.release_date ? "Change date" : "Set release date"}
-          </button>
-        )}
-      </div>
     </div>
   );
 }

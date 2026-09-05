@@ -157,6 +157,13 @@ export async function changeReleaseDate(releaseId: string, newDate: string) {
     .eq("id", releaseId);
   if (relErr) throw new Error(relErr.message);
 
+  // Singles are mirrored into the songs registry (used by Content + Results),
+  // so keep that copy's date in step with the release.
+  await supabase
+    .from("songs")
+    .update({ original_release_date: newDate })
+    .eq("release_id", releaseId);
+
   const { data: tasks } = await supabase
     .from("release_tasks")
     .select("id, offset_days")
