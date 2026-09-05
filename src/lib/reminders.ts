@@ -5,11 +5,17 @@ import { weekBounds } from "@/lib/wtf/compile";
 type Admin = ReturnType<typeof createAdminClient>;
 
 /*
-  Reminder engine. Runs hourly and decides, per artist, whether it's their hour.
+  Reminder engine. Decides, per artist, whether they're due a reminder.
 
-  Everything keys off the artist's OWN timezone, so "8am" means 8am where they
-  are. The last-sent dates are stored as the artist's LOCAL date, which is what
-  makes an hourly job safe to run 24 times a day and still send once.
+  Everything keys off the artist's OWN timezone. The last-sent dates are stored
+  as the artist's LOCAL date, so the job is idempotent — it can run any number of
+  times a day and still send once.
+
+  Timing note: Vercel's Hobby plan allows only ONE cron run per day, so we can't
+  fire exactly on each artist's chosen hour. Instead the daily run sends to
+  anyone whose chosen hour has already passed locally — i.e. "at or after" their
+  time. Moving to an hourly schedule makes it exact and needs no code change
+  here beyond the comparison below.
 */
 
 // The artist's local date, hour and weekday, from an IANA timezone.
@@ -94,7 +100,9 @@ export async function runReminders(
 
   for (const p of (prefsRows ?? []) as Prefs[]) {
     const now = localNow(p.timezone);
-    if (now.hour !== p.reminder_hour) {
+    // "At or after" their chosen hour (see timing note above). On an hourly
+    // schedule this becomes `!==` for exact delivery.
+    if (now.hour < p.reminder_hour) {
       skipped++;
       continue;
     }

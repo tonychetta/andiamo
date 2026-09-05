@@ -64,7 +64,9 @@ export function ReminderSettings({ initial }: { initial: ReminderPrefsProps }) {
       <div className="mt-4 flex items-center justify-between gap-3">
         <div>
           <p className="text-sm text-ink">Send at</p>
-          <p className="text-xs text-ink-soft">Your local time.</p>
+          <p className="text-xs text-ink-soft">
+            Your local time — sent at or just after.
+          </p>
         </div>
         <select
           value={hour}
