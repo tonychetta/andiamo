@@ -1,0 +1,22 @@
+name: Task notifications
+
+# Vercel's Hobby plan only allows one cron run per day, which can't hit 9am in
+# every artist's timezone. This pings the same endpoint hourly instead, so each
+# artist is notified at 9am where they actually are. The endpoint is secured by
+# CRON_SECRET and only sends once per artist per local day, so hourly pings are
+# safe — most of them do nothing.
+on:
+  schedule:
+    - cron: "0 * * * *" # every hour, UTC
+  workflow_dispatch: # lets you trigger a run by hand from the Actions tab
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger reminder run
+        run: |
+          curl --silent --show-error --fail-with-body \
+            --max-time 60 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            https://andiamodev.com/api/cron/reminders

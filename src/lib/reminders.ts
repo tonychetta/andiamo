@@ -12,14 +12,18 @@ type Admin = ReturnType<typeof createAdminClient>;
   nudge. Which one you get is derived from the date, so it varies across the
   week without needing to store a counter.
 
-  Timing note: Vercel's Hobby plan allows one cron run per day, so the job fires
-  at a single UTC hour rather than 9am in each artist's own timezone. The
-  weekday and the once-per-day guard are still evaluated in the artist's local
-  time, so nobody gets two, and nobody gets one on the wrong day.
+  Timing: a GitHub Actions workflow pings this hourly, so each artist is sent to
+  on the first run at or after 9am in THEIR timezone. Vercel's own daily cron
+  stays on as a backstop in case Actions is delayed or disabled — the
+  once-per-local-day guard makes extra runs harmless.
 */
 
 // The artist's local date and weekday, from an IANA timezone.
-export function localNow(tz: string): { date: string; weekday: number } {
+export function localNow(tz: string): {
+  date: string;
+  hour: number;
+  weekday: number;
+} {
   let parts: Intl.DateTimeFormatPart[];
   try {
     parts = new Intl.DateTimeFormat("en-US", {
@@ -27,6 +31,8 @@ export function localNow(tz: string): { date: string; weekday: number } {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
+      hour: "2-digit",
+      hour12: false,
       weekday: "short",
     }).formatToParts(new Date());
   } catch {
@@ -36,11 +42,14 @@ export function localNow(tz: string): { date: string; weekday: number } {
   const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   return {
     date: `${get("year")}-${get("month")}-${get("day")}`,
+    // Some runtimes render midnight as "24"; normalise it.
+    hour: Number(get("hour")) % 24,
     weekday: Math.max(0, days.indexOf(get("weekday"))),
   };
 }
 
 const SEND_DAYS = new Set([1, 3, 5]); // Mon, Wed, Fri
+const SEND_HOUR = 9; // 9am in the artist's own timezone
 
 // What's live on this week's WTF, for the message body.
 async function weekSnapshot(admin: Admin, artistId: string, localDate: string) {
@@ -116,7 +125,14 @@ export async function runReminders(
     const tz = prefs?.timezone || "UTC";
     const now = localNow(tz);
 
-    if (!SEND_DAYS.has(now.weekday) || prefs?.last_sent_on === now.date) {
+    // ">= 9am" rather than "== 9am" on purpose: on the hourly schedule the
+    // first run at or after 9am local sends it, and any later run that day is a
+    // harmless catch-up if an earlier one was missed or delayed.
+    if (
+      !SEND_DAYS.has(now.weekday) ||
+      now.hour < SEND_HOUR ||
+      prefs?.last_sent_on === now.date
+    ) {
       skipped++;
       continue;
     }
