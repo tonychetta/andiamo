@@ -110,27 +110,17 @@ export async function deletePushSubscription(endpoint: string) {
 
 // ---------- Reminder settings ----------
 
-export type ReminderPrefs = {
-  dailyEnabled: boolean;
-  weeklyEnabled: boolean;
-  reminderHour: number;
-  timezone: string;
-};
-
-// Upsert the artist's reminder settings. The timezone comes from the browser so
-// "8am" means 8am where they actually are, not 8am UTC.
-export async function saveReminderPrefs(prefs: ReminderPrefs) {
+// One switch: Task Notifications on or off. Timezone rides along so Mon/Wed/Fri
+// is evaluated where the artist actually is.
+export async function saveTaskNotifications(enabled: boolean, timezone: string) {
   const supabase = await createClient();
   const { data: aid } = await supabase.rpc("current_artist_id");
   if (!aid) return;
-  const hour = Math.min(23, Math.max(0, Math.round(prefs.reminderHour)));
   const { error } = await supabase.from("notification_prefs").upsert(
     {
       artist_id: aid as string,
-      daily_enabled: prefs.dailyEnabled,
-      weekly_enabled: prefs.weeklyEnabled,
-      reminder_hour: hour,
-      timezone: prefs.timezone || "UTC",
+      tasks_enabled: enabled,
+      timezone: timezone || "UTC",
     },
     { onConflict: "artist_id" },
   );

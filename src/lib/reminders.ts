@@ -5,25 +5,21 @@ import { weekBounds } from "@/lib/wtf/compile";
 type Admin = ReturnType<typeof createAdminClient>;
 
 /*
-  Reminder engine. Decides, per artist, whether they're due a reminder.
+  Task Notifications — Mon / Wed / Fri, once each of those days.
 
-  Everything keys off the artist's OWN timezone. The last-sent dates are stored
-  as the artist's LOCAL date, so the job is idempotent — it can run any number of
-  times a day and still send once.
+  Wording rotates so three a week doesn't read like the same alert repeating:
+  the task count, the Priority task, and a general "before your next meeting"
+  nudge. Which one you get is derived from the date, so it varies across the
+  week without needing to store a counter.
 
-  Timing note: Vercel's Hobby plan allows only ONE cron run per day, so we can't
-  fire exactly on each artist's chosen hour. Instead the daily run sends to
-  anyone whose chosen hour has already passed locally — i.e. "at or after" their
-  time. Moving to an hourly schedule makes it exact and needs no code change
-  here beyond the comparison below.
+  Timing note: Vercel's Hobby plan allows one cron run per day, so the job fires
+  at a single UTC hour rather than 9am in each artist's own timezone. The
+  weekday and the once-per-day guard are still evaluated in the artist's local
+  time, so nobody gets two, and nobody gets one on the wrong day.
 */
 
-// The artist's local date, hour and weekday, from an IANA timezone.
-export function localNow(tz: string): {
-  date: string;
-  hour: number;
-  weekday: number;
-} {
+// The artist's local date and weekday, from an IANA timezone.
+export function localNow(tz: string): { date: string; weekday: number } {
   let parts: Intl.DateTimeFormatPart[];
   try {
     parts = new Intl.DateTimeFormat("en-US", {
@@ -31,36 +27,22 @@ export function localNow(tz: string): {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
-      hour: "2-digit",
-      hour12: false,
       weekday: "short",
     }).formatToParts(new Date());
   } catch {
-    // Unknown timezone string — fall back to UTC rather than skipping them.
-    return localNow("UTC");
+    return localNow("UTC"); // unknown tz — don't drop the artist
   }
   const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
   const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  // "24" shows up at midnight in some environments; normalise it to 0.
-  const hour = Number(get("hour")) % 24;
   return {
     date: `${get("year")}-${get("month")}-${get("day")}`,
-    hour,
     weekday: Math.max(0, days.indexOf(get("weekday"))),
   };
 }
 
-type Prefs = {
-  artist_id: string;
-  daily_enabled: boolean;
-  weekly_enabled: boolean;
-  reminder_hour: number;
-  timezone: string;
-  last_daily_on: string | null;
-  last_weekly_on: string | null;
-};
+const SEND_DAYS = new Set([1, 3, 5]); // Mon, Wed, Fri
 
-// What's actually on this week's WTF, for the message body.
+// What's live on this week's WTF, for the message body.
 async function weekSnapshot(admin: Admin, artistId: string, localDate: string) {
   const { start } = weekBounds(localDate);
   const { data: tasks } = await admin
@@ -69,83 +51,97 @@ async function weekSnapshot(admin: Admin, artistId: string, localDate: string) {
     .eq("artist_id", artistId)
     .eq("on_wtf", true)
     .eq("wtf_week", start);
-  const all = tasks ?? [];
-  const open = all.filter(
+  const open = (tasks ?? []).filter(
     (t) => t.status !== "completed" && t.status !== "complete_and_push",
   );
-  const priority = open.find((t) => t.wtf_priority) ?? null;
-  return { total: all.length, open: open.length, priority };
+  return {
+    open: open.length,
+    priority: open.find((t) => t.wtf_priority) ?? null,
+  };
+}
+
+type Msg = { title: string; body: string };
+
+// Rotate by date so Mon / Wed / Fri each land differently.
+function composeMessage(
+  localDate: string,
+  open: number,
+  priority: string | null,
+): Msg {
+  const dayIndex = Math.floor(Date.parse(`${localDate}T00:00:00Z`) / 86_400_000);
+  const plural = open === 1 ? "task" : "tasks";
+  const variants: Msg[] = [
+    {
+      title: "This week's board",
+      body: `${open} ${plural} still open on your WTF.`,
+    },
+    priority
+      ? { title: "Start with your Priority", body: priority }
+      : { title: "Pick your Priority", body: `${open} ${plural} open — star the one that matters most.` },
+    {
+      title: "Before your next meeting",
+      body: `Work through the ${open} ${plural} left on this week's form.`,
+    },
+  ];
+  return variants[dayIndex % variants.length];
 }
 
 export async function runReminders(
   admin: Admin,
-): Promise<{ daily: number; weekly: number; skipped: number }> {
-  // Only artists who actually have a device registered can be reminded.
+): Promise<{ sent: number; skipped: number }> {
+  // Only artists with a registered device can be notified at all.
   const { data: subs } = await admin
     .from("push_subscriptions")
     .select("artist_id");
-  const subscribed = new Set((subs ?? []).map((s) => s.artist_id));
-  if (subscribed.size === 0) return { daily: 0, weekly: 0, skipped: 0 };
+  const subscribed = [...new Set((subs ?? []).map((s) => s.artist_id))];
+  if (subscribed.length === 0) return { sent: 0, skipped: 0 };
 
   const { data: prefsRows } = await admin
     .from("notification_prefs")
-    .select(
-      "artist_id, daily_enabled, weekly_enabled, reminder_hour, timezone, last_daily_on, last_weekly_on",
-    )
-    .in("artist_id", [...subscribed]);
+    .select("artist_id, tasks_enabled, timezone, last_sent_on")
+    .in("artist_id", subscribed);
+  const prefsById = new Map((prefsRows ?? []).map((p) => [p.artist_id, p]));
 
-  let daily = 0;
-  let weekly = 0;
+  let sent = 0;
   let skipped = 0;
 
-  for (const p of (prefsRows ?? []) as Prefs[]) {
-    const now = localNow(p.timezone);
-    // "At or after" their chosen hour (see timing note above). On an hourly
-    // schedule this becomes `!==` for exact delivery.
-    if (now.hour < p.reminder_hour) {
+  for (const artistId of subscribed) {
+    // No row yet means never touched the setting — notifications are ON by
+    // default, so absence must not mean "off".
+    const prefs = prefsById.get(artistId);
+    if (prefs && !prefs.tasks_enabled) {
+      skipped++;
+      continue;
+    }
+    const tz = prefs?.timezone || "UTC";
+    const now = localNow(tz);
+
+    if (!SEND_DAYS.has(now.weekday) || prefs?.last_sent_on === now.date) {
       skipped++;
       continue;
     }
 
-    const snap = await weekSnapshot(admin, p.artist_id, now.date);
-
-    // Weekly, on Sunday: only worth sending if the week is still empty.
-    if (
-      p.weekly_enabled &&
-      now.weekday === 0 &&
-      p.last_weekly_on !== now.date &&
-      snap.total === 0
-    ) {
-      const { sent } = await sendPushToArtist(p.artist_id, {
-        title: "New week, empty WTF",
-        body: "Swipe this week's tasks onto your Weekly Task Form from the Roadmap.",
-        url: "/roadmap",
-      });
-      if (sent > 0) weekly++;
-      await admin
-        .from("notification_prefs")
-        .update({ last_weekly_on: now.date })
-        .eq("artist_id", p.artist_id);
-      continue; // one push per artist per hour, never two at once
+    // Nothing open means nothing to nudge about — an empty WTF is the coach's
+    // to fill after the meeting, not the artist's to be pestered over.
+    const snap = await weekSnapshot(admin, artistId, now.date);
+    if (snap.open === 0) {
+      skipped++;
+      continue;
     }
 
-    // Daily: only if there's actually something open to nudge about.
-    if (p.daily_enabled && p.last_daily_on !== now.date && snap.open > 0) {
-      const body = snap.priority
-        ? `Priority: ${snap.priority.description}`
-        : `${snap.open} task${snap.open === 1 ? "" : "s"} left this week.`;
-      const { sent } = await sendPushToArtist(p.artist_id, {
-        title: snap.priority ? "Start here today" : "Your week so far",
-        body,
-        url: "/wtf",
-      });
-      if (sent > 0) daily++;
-      await admin
-        .from("notification_prefs")
-        .update({ last_daily_on: now.date })
-        .eq("artist_id", p.artist_id);
-    }
+    const msg = composeMessage(
+      now.date,
+      snap.open,
+      snap.priority?.description ?? null,
+    );
+    const res = await sendPushToArtist(artistId, { ...msg, url: "/wtf" });
+    if (res.sent > 0) sent++;
+
+    await admin.from("notification_prefs").upsert(
+      { artist_id: artistId, timezone: tz, last_sent_on: now.date },
+      { onConflict: "artist_id" },
+    );
   }
 
-  return { daily, weekly, skipped };
+  return { sent, skipped };
 }

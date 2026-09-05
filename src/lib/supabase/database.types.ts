@@ -528,33 +528,24 @@ export type Database = {
       notification_prefs: {
         Row: {
           artist_id: string
-          daily_enabled: boolean
-          last_daily_on: string | null
-          last_weekly_on: string | null
-          reminder_hour: number
+          last_sent_on: string | null
+          tasks_enabled: boolean
           timezone: string
           updated_at: string
-          weekly_enabled: boolean
         }
         Insert: {
           artist_id: string
-          daily_enabled?: boolean
-          last_daily_on?: string | null
-          last_weekly_on?: string | null
-          reminder_hour?: number
+          last_sent_on?: string | null
+          tasks_enabled?: boolean
           timezone?: string
           updated_at?: string
-          weekly_enabled?: boolean
         }
         Update: {
           artist_id?: string
-          daily_enabled?: boolean
-          last_daily_on?: string | null
-          last_weekly_on?: string | null
-          reminder_hour?: number
+          last_sent_on?: string | null
+          tasks_enabled?: boolean
           timezone?: string
           updated_at?: string
-          weekly_enabled?: boolean
         }
         Relationships: []
       }
