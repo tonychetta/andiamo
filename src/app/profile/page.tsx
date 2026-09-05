@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { signOut } from "@/app/actions";
 import { EnableNotifications } from "@/components/EnableNotifications";
+import { ReminderSettings } from "@/components/ReminderSettings";
 import { ProfilePicture } from "@/components/ProfilePicture";
 import { CoachLink } from "@/components/CoachLink";
 import { DeleteAccount } from "@/components/DeleteAccount";
@@ -37,6 +38,11 @@ export default async function ProfilePage() {
   // read the coaches table under RLS). An artist can have several coaches.
   let coachNames: string[] = [];
   let tierLabel: string | null = null;
+  let reminderPrefs = {
+    dailyEnabled: true,
+    weeklyEnabled: true,
+    reminderHour: 8,
+  };
   if (role === "artist") {
     const { data: artistRow } = await supabase
       .from("artists")
@@ -44,6 +50,20 @@ export default async function ProfilePage() {
       .eq("user_id", userId)
       .maybeSingle();
     tierLabel = artistRow?.tier ? (TIER_LABEL[artistRow.tier] ?? artistRow.tier) : null;
+    if (artistRow?.id) {
+      const { data: prefs } = await supabase
+        .from("notification_prefs")
+        .select("daily_enabled, weekly_enabled, reminder_hour")
+        .eq("artist_id", artistRow.id)
+        .maybeSingle();
+      if (prefs) {
+        reminderPrefs = {
+          dailyEnabled: prefs.daily_enabled,
+          weeklyEnabled: prefs.weekly_enabled,
+          reminderHour: prefs.reminder_hour,
+        };
+      }
+    }
     if (artistRow?.id) {
       const admin = createAdminClient();
       const { data: links } = await admin
@@ -131,6 +151,9 @@ export default async function ProfilePage() {
             Notifications
           </p>
           <EnableNotifications />
+          <div className="mt-3">
+            <ReminderSettings initial={reminderPrefs} />
+          </div>
           <p className="mt-2 text-xs leading-relaxed text-ink-soft">
             Get a push when your producer starts work on a song. On iPhone, add
             Andiamo to your Home Screen first.

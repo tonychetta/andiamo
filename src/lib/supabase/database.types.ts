@@ -525,6 +525,39 @@ export type Database = {
           },
         ]
       }
+      notification_prefs: {
+        Row: {
+          artist_id: string
+          daily_enabled: boolean
+          last_daily_on: string | null
+          last_weekly_on: string | null
+          reminder_hour: number
+          timezone: string
+          updated_at: string
+          weekly_enabled: boolean
+        }
+        Insert: {
+          artist_id: string
+          daily_enabled?: boolean
+          last_daily_on?: string | null
+          last_weekly_on?: string | null
+          reminder_hour?: number
+          timezone?: string
+          updated_at?: string
+          weekly_enabled?: boolean
+        }
+        Update: {
+          artist_id?: string
+          daily_enabled?: boolean
+          last_daily_on?: string | null
+          last_weekly_on?: string | null
+          reminder_hour?: number
+          timezone?: string
+          updated_at?: string
+          weekly_enabled?: boolean
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           account_type: Database["public"]["Enums"]["account_type"]
